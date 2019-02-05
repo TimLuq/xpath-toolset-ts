@@ -924,33 +924,283 @@ class RelativePathExpr extends MultiOperativeExpr<TStepExpr, "/" | "//"> {
     }
 }
 
+type TTStepExpr = TPostfixExpr | TAxisStep;
+const StepExpr = {
+    parse(tokens: string[], usedTokens: number): [TRelativePathExpr, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if ((tokens[tail + 1] === "::" || (tokens[tail + 1] === " " && tokens[tail + 2] === "::")) && (
+            AxisStep.forwardKeywords.indexOf(tokens[tail] as any) !== -1 ||
+            AxisStep.reverseKeywords.indexOf(tokens[tail] as any) !== -1
+        )) {
+            return AxisStep.parse(tokens, tail);
+        }
+        return MultiOperativeExpr.parseOp<EQName, "/" | "//">(RelativePathExpr, StepExpr, tokens, usedTokens);
+    },
+};
+
+class AxisStep {
+    public static forwardKeywords: [
+        "child", "descendant", "attribute", "self", "descendant-or-self",
+        "following-sibling", "following", "namespace"
+    ] = [
+        "child", "descendant", "attribute", "self", "descendant-or-self",
+        "following-sibling", "following", "namespace",
+    ];
+    public static reverseKeywords: [
+        "parent", "ancestor", "preceding-sibling", "preceding", "ancestor-or-self"
+    ] = [
+        "parent", "ancestor", "preceding-sibling", "preceding", "ancestor-or-self",
+    ];
+    public static parse(tokens: string[], usedTokens: number): [AxisStep, number] {
+
+    }
+}
+
 type PrimaryExpr
     = TLiteral | ParenthesizedExpr | VarRef | ContextItemExpr
-    | FunctionCall | FunctionItemExpr | MapCons | ArrayCons | UnaryLookup;
+    | FunctionCall | FunctionItemExpr | MapCons | TArrayCons | UnaryLookup;
 type TLiteral = TNumericLiteral | StringLiteral;
 type TNumericLiteral = IntegerLiteral | DecimalLiteral | DoubleLiteral;
 type FunctionItemExpr = NamedFunctionRef | InlineFunctionExpr;
-function parsePrimaryExpr(tokens: string[], usedTokens: number): [PrimaryExpr, number] {
-    let tail = usedTokens;
-    tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
-    if (tokens[tail] === "(") {
-        return ParenthesizedExpr.parse(tokens, tail);
-    }
-    if (tokens[tail] === ".") {
-        const c = tokens[tail + 1] ? tokens[tail + 1].charCodeAt(0) : 0;
-        if (c >= 0x30 && c <= 0x39) {
+const PrimaryExpr = {
+    parse(tokens: string[], usedTokens: number): [PrimaryExpr, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] === "(") {
+            return ParenthesizedExpr.parse(tokens, tail);
+        }
+        if (tokens[tail] === ".") {
+            const c = tokens[tail + 1] ? tokens[tail + 1].charCodeAt(0) : 0;
+            if (c >= 0x30 && c <= 0x39) {
+                return NumericLiteral.parse(tokens, tail);
+            }
+            return [ContextItemExpr.instance, tail + 1];
+        }
+        if (tokens[tail] === "function" && (
+            tokens[tail + 1] === "(" || (tokens[tail + 1] === " " && tokens[tail + 2] === "(")
+        )) {
+            return InlineFunctionExpr.parse(tokens, tail);
+        }
+        if (tokens[tail] === "$") {
+            return VarRef.parse(tokens, tail);
+        }
+        if (tokens[tail] === "?") {
+            return UnaryLookup.parse(tokens, tail);
+        }
+        if (tokens[tail] === "\"" || tokens[tail] === "'") {
+            return StringLiteral.parse(tokens, tail);
+        }
+        if (tokens[tail] && /^[0-9]/.test(tokens[tail])) {
             return NumericLiteral.parse(tokens, tail);
         }
-        return [ContextItemExpr.instance, tail + 1];
+        if (tokens[tail] === "map" && (
+            tokens[tail + 1] === "{" || (tokens[tail + 1] === " " && tokens[tail + 2] === "{")
+        )) {
+            return MapCons.parse(tokens, tail);
+        }
+        if (tokens[tail] === "[" || (tokens[tail] === "array" && (
+            tokens[tail + 1] === "{" || (tokens[tail + 1] === " " && tokens[tail + 2] === "{")
+        ))) {
+            return ArrayCons.parse(tokens, tail);
+        }
+
+        {
+            const [r, t] = EQName.parse(tokens, tail);
+            tail = t;
+            tail = tokens[tail] === " " ? tail + 1 : tail;
+            if (tokens[tail] === "#") {
+                return NamedFunctionRef.parse(tokens, t, r);
+            }
+            if (tokens[tail] === "(") {
+                return FunctionCall.parse(tokens, tail, r);
+            }
+        }
+        throw new XPathUnexpectedTokenError(tokens, usedTokens, "PrimaryExpr");
+    },
+};
+
+type TArrayCons = SquareArrayCons | CurlyArrayCons;
+const ArrayCons = {
+    parse(tokens: string[], usedTokens: number): [TKeySpecifier, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] === "array") {
+            return CurlyArrayCons.parse(tokens, tail);
+        }
+        if (tokens[tail] === "[") {
+            return SquareArrayCons.parse(tokens, tail);
+        }
+        throw new XPathUnexpectedTokenError(tokens, usedTokens, "ArrayCons");
+    },
+};
+
+class CurlyArrayCons implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number): [CurlyArrayCons, number] {
+        let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
+        if (tokens[tail] !== "array") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'array' of CurlyArrayCons");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "{") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['function', '('] of InlineFunctionExpr");
+        }
+        const [ee, bt] = EnclosedExpr.parse(tokens, tail);
+        return [new CurlyArrayCons(ee), bt];
     }
-    if (tokens[tail] === "function" && tokens[tail + 1] === "(") {
-        return InlineFunctionExpr.parse(tokens, tail);
+
+    public constructor(
+        public expression: EnclosedExpr,
+    ) {}
+
+    /**
+     * Push the tokens for this expression to an object.
+     * @template T
+     * @param {T} pushable the object to `push` to
+     * @returns {T}
+     */
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("array", " ");
+        return this.expression.render(pushable);
     }
-    if (tokens[tail] === "$") {
-        return VarRef.parse(tokens, tail);
+
+    public toString() {
+        return this.render([]).join("");
     }
-    if (tokens[tail] === "\"" || tokens[tail] === "'") {
-        return StringLiteral.parse(tokens, tail);
+}
+
+class SquareArrayCons implements IXPathGrammar {
+    public static operators: [","] = [","];
+    public static parse(tokens: string[], usedTokens: number): [SquareArrayCons, number] {
+        let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
+        if (tokens[tail] !== "[") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'[' of SquareArrayCons");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1;
+        if (tokens[tail] === "]") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "']' of SquareArrayCons");
+        }
+        const r: ExprSingle[] = [];
+        do {
+            tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+            const [e, t] = ExprSingle.parse(tokens, tail);
+            r.push(e);
+            tail = tokens[t] === " " ? t + 1 : t; // allow space
+        } while (tokens[tail] === "," && tail++);
+
+        if (tokens[tail] === "]") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "']' of SquareArrayCons");
+        }
+
+        return [new SquareArrayCons(r), tail + 1];
+    }
+
+    public constructor(public expressions: ExprSingle[]) {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("[");
+        let fst = true;
+        for (const a of this.expressions) {
+            if (fst) {
+                fst = false;
+            } else {
+                pushable.push(",", " ");
+            }
+            a.render(pushable);
+        }
+        pushable.push("]");
+        return pushable;
+    }
+}
+
+class UnaryLookup extends LeadingUnaryOpExpr<TKeySpecifier, "?"> {
+    public static operator: "?" = "?";
+    public static parse(tokens: string[], usedTokens: number): [TKeySpecifier, number] {
+        return LeadingUnaryOpExpr.parseLeading<TKeySpecifier, "?">(UnaryLookup, KeySpecifier, tokens, usedTokens);
+    }
+}
+
+type TKeySpecifier = NCName | IntegerLiteral | ParenthesizedExpr | Wildcard;
+const KeySpecifier = {
+    parse(tokens: string[], usedTokens: number): [TKeySpecifier, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] === "*") {
+            return [Wildcard.instance, tail + 1];
+        }
+        if (tokens[tail] === "(") {
+            return ParenthesizedExpr.parse(tokens, tail);
+        }
+        if (/^[0-9]+$/.test(tokens[tail])) {
+            return IntegerLiteral.parse(tokens, tail);
+        }
+        return NCName.parse(tokens, tail);
+    },
+};
+
+class FunctionCall implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number, parsedName?: EQName): [FunctionCall, number] {
+        let tail = usedTokens;
+        let name = parsedName;
+        if (!name) {
+            tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+            const [eqn, t] = EQName.parse(tokens, tail);
+            tail = t;
+            name = eqn;
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail;
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of FunctionCall");
+        }
+        const [args, tr] = parseArgumentList(tokens, tail);
+        return [new FunctionCall(name, args), tr];
+    }
+
+    public constructor(public name: EQName, public args: Array<ExprSingle | ArgumentPlaceholder>) {}
+    public render<T extends IPushable>(pushable: T): T {
+        this.name.render(pushable);
+        pushable.push("(");
+        let fst = true;
+        for (const a of this.args) {
+            if (fst) {
+                fst = false;
+            } else {
+                pushable.push(",", " ");
+            }
+            a.render(pushable);
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() {
+        return this.render([]).join("");
+    }
+}
+
+class NamedFunctionRef implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number, parsedName?: EQName): [NamedFunctionRef, number] {
+        let tail = usedTokens;
+        let name = parsedName;
+        if (!name) {
+            tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+            const [eqn, t] = EQName.parse(tokens, tail);
+            tail = t;
+            name = eqn;
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail;
+        if (tokens[tail] !== "#") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'#' of NamedFunctionRef");
+        }
+        const [n, tr] = IntegerLiteral.parse(tokens, tail + 1);
+        return [new NamedFunctionRef(name, n), tr];
+    }
+
+    public constructor(public name: EQName, public arity: IntegerLiteral) {}
+    public render<T extends IPushable>(pushable: T): T {
+        this.name.render(pushable);
+        pushable.push("#");
+        return this.arity.render(pushable);
     }
 }
 

@@ -8,6 +8,7 @@ export class XPathParseError extends Error {
 }
 
 export class XPathUnexpectedTokenError extends XPathParseError {
+    public expected: string | undefined;
     public constructor(tokens: string[], token: number, expected?: string) {
         const t = tokens[token];
         let message = `unexpected token ${t === undefined ? "[EOL]" : JSON.stringify(t)}`;
@@ -15,6 +16,7 @@ export class XPathUnexpectedTokenError extends XPathParseError {
             message += " (expected " + expected + ")";
         }
         super("parse-token", message, tokens, token);
+        this.expected = expected;
     }
 }
 
