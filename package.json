@@ -1,0 +1,32 @@
+{
+  "name": "xpath-toolset",
+  "version": "0.0.1",
+  "description": "XPath toolset to work with and process XPath expressions.",
+  "main": "build/xpath-toolset",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TimLuq/xpath-toolset-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TimLuq/xpath-toolset-ts/issues"
+  },
+  "homepage": "https://github.com/TimLuq/xpath-toolset-ts",
+  "author": {
+    "name": "TimLuq",
+    "url": "https://github.com/TimLuq"
+  },
+  "license": "LGPLv3",
+  "devDependencies": {
+    "@babel/core": "^7.2.2",
+    "@babel/plugin-proposal-class-properties": "^7.3.0",
+    "@babel/plugin-syntax-dynamic-import": "^7.2.0",
+    "@babel/preset-env": "^7.3.1",
+    "@babel/preset-typescript": "^7.1.0",
+    "@babel/register": "^7.0.0",
+    "ava": "^1.2.0",
+    "rollup": "^1.1.2",
+    "rollup-plugin-babel": "^4.3.2",
+    "rollup-plugin-sourcemaps": "^0.4.2",
+    "rollup-plugin-terser": "^4.0.3"
+  }
+}
