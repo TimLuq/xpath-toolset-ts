@@ -11,7 +11,7 @@ import { Biggie, IBiggie } from "../helpers/biggie";
 
 class Expr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [Expr, number] {
-        const r: ExprSingle[] = [];
+        const r: TExprSingle[] = [];
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
         do {
             const [e, t] = ExprSingle.parse(tokens, tail);
@@ -21,7 +21,7 @@ class Expr implements IXPathGrammar {
         return [new Expr(r), tail];
     }
 
-    public constructor(public expressions: ExprSingle[]) {}
+    public constructor(public expressions: TExprSingle[]) {}
 
     /**
      * Push the tokens for this expression to an object.
@@ -46,11 +46,9 @@ class Expr implements IXPathGrammar {
     }
 }
 
-/**
- * @abstract
- */
-abstract class ExprSingle implements IXPathGrammar {
-    public static parse(tokens: string[], usedTokens: number): [ExprSingle, number] {
+type TExprSingle = ForExpr | LetExpr | QuantifiedExpr | IfExpr | TOrExpr;
+const ExprSingle = {
+    parse(tokens: string[], usedTokens: number): [TExprSingle, number] {
         const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
         const t = tokens[tail];
         if (t === "for") {
@@ -66,22 +64,10 @@ abstract class ExprSingle implements IXPathGrammar {
         } else {
             return OrExpr.parse(tokens, tail);
         }
-    }
+    },
+};
 
-    /**
-     * Push the tokens for this expression to an object.
-     * @template T
-     * @param {T} pushable the object to `push` to
-     * @returns {T}
-     */
-    public abstract render<T extends IPushable>(pushable: T): T;
-
-    public toString() {
-        return this.render([]).join("");
-    }
-}
-
-class ForExpr extends ExprSingle {
+class ForExpr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [ForExpr, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
 
@@ -108,9 +94,7 @@ class ForExpr extends ExprSingle {
         }
     }
 
-    public constructor(public bindings: SimpleBinding[], public expression: ExprSingle) {
-        super();
-    }
+    public constructor(public bindings: SimpleBinding[], public expression: TExprSingle) {}
 
     /**
      * Push the tokens for this expression to an object.
@@ -133,9 +117,13 @@ class ForExpr extends ExprSingle {
         this.expression.render(pushable);
         return pushable;
     }
+
+    public toString(): string {
+        return this.render([]).join("");
+    }
 }
 
-class LetExpr extends ExprSingle {
+class LetExpr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [LetExpr, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
 
@@ -162,9 +150,7 @@ class LetExpr extends ExprSingle {
         }
     }
 
-    public constructor(public bindings: SimpleBinding[], public expression: ExprSingle) {
-        super();
-    }
+    public constructor(public bindings: SimpleBinding[], public expression: TExprSingle) {}
 
     /**
      * Push the tokens for this expression to an object.
@@ -187,9 +173,13 @@ class LetExpr extends ExprSingle {
         this.expression.render(pushable);
         return pushable;
     }
+
+    public toString(): string {
+        return this.render([]).join("");
+    }
 }
 
-class QuantifiedExpr extends ExprSingle {
+class QuantifiedExpr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [QuantifiedExpr, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
 
@@ -219,10 +209,8 @@ class QuantifiedExpr extends ExprSingle {
     public constructor(
         public quantification: "some" | "every",
         public bindings: SimpleBinding[],
-        public expression: ExprSingle,
-    ) {
-        super();
-    }
+        public expression: TExprSingle,
+    ) {}
 
     /**
      * Push the tokens for this expression to an object.
@@ -245,9 +233,13 @@ class QuantifiedExpr extends ExprSingle {
         this.expression.render(pushable);
         return pushable;
     }
+
+    public toString(): string {
+        return this.render([]).join("");
+    }
 }
 
-class IfExpr extends ExprSingle {
+class IfExpr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [IfExpr, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
 
@@ -288,11 +280,9 @@ class IfExpr extends ExprSingle {
 
     public constructor(
         public condition: Expr,
-        public thenExpr: ExprSingle,
-        public elseExpr: ExprSingle,
-    ) {
-        super();
-    }
+        public thenExpr: TExprSingle,
+        public elseExpr: TExprSingle,
+    ) {}
 
     /**
      * Push the tokens for this expression to an object.
@@ -308,6 +298,10 @@ class IfExpr extends ExprSingle {
         pushable.push(" ", "else", " ");
         this.elseExpr.render(pushable);
         return pushable;
+    }
+
+    public toString(): string {
+        return this.render([]).join("");
     }
 }
 
@@ -692,7 +686,7 @@ class EmptyItemType implements IXPathGrammar {
     public toString() { return "item()"; }
 }
 
-function parseArgumentList(tokens: string[], usedTokens: number): [Array<ExprSingle | ArgumentPlaceholder>, number] {
+function parseArgumentList(tokens: string[], usedTokens: number): [Array<TExprSingle | ArgumentPlaceholder>, number] {
     let tail = usedTokens;
     tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
     if (tokens[tail] !== "(") {
@@ -702,7 +696,7 @@ function parseArgumentList(tokens: string[], usedTokens: number): [Array<ExprSin
     if (tokens[tail] === ")") {
         return [[], tail + 1];
     }
-    const r: Array<ExprSingle | ArgumentPlaceholder> = [];
+    const r: Array<TExprSingle | ArgumentPlaceholder> = [];
     do {
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] === "?") {
@@ -811,7 +805,7 @@ class ArrowFunctionExpr {
 
     public constructor(
         public specifier: EQName | VarRef | ParenthesizedExpr,
-        public argList: Array<ExprSingle | ArgumentPlaceholder>,
+        public argList: Array<TExprSingle | ArgumentPlaceholder>,
     ) {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -939,6 +933,7 @@ const StepExpr = {
     },
 };
 
+type TAxisStep = AxisStep;
 class AxisStep {
     public static forwardKeywords: [
         "child", "descendant", "attribute", "self", "descendant-or-self",
@@ -1080,7 +1075,7 @@ class SquareArrayCons implements IXPathGrammar {
         if (tokens[tail] === "]") {
             throw new XPathUnexpectedTokenError(tokens, tail, "']' of SquareArrayCons");
         }
-        const r: ExprSingle[] = [];
+        const r: TExprSingle[] = [];
         do {
             tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
             const [e, t] = ExprSingle.parse(tokens, tail);
@@ -1088,14 +1083,14 @@ class SquareArrayCons implements IXPathGrammar {
             tail = tokens[t] === " " ? t + 1 : t; // allow space
         } while (tokens[tail] === "," && tail++);
 
-        if (tokens[tail] === "]") {
+        if (tokens[tail] !== "]") {
             throw new XPathUnexpectedTokenError(tokens, tail, "']' of SquareArrayCons");
         }
 
         return [new SquareArrayCons(r), tail + 1];
     }
 
-    public constructor(public expressions: ExprSingle[]) {}
+    public constructor(public expressions: TExprSingle[]) {}
 
     public render<T extends IPushable>(pushable: T): T {
         pushable.push("[");
@@ -1107,6 +1102,54 @@ class SquareArrayCons implements IXPathGrammar {
                 pushable.push(",", " ");
             }
             a.render(pushable);
+        }
+        pushable.push("]");
+        return pushable;
+    }
+}
+
+class MapCons implements IXPathGrammar {
+    public static operators: [","] = [","];
+    public static parse(tokens: string[], usedTokens: number): [MapCons, number] {
+        let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
+        if (tokens[tail] !== "map") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'map' of MapCons");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1;
+        if (tokens[tail] === "]") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'{' of MapCons");
+        }
+        const r: Array<[TExprSingle, TExprSingle]> = [];
+        do {
+            tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+            const [k, kt] = ExprSingle.parse(tokens, tail);
+            tail = tokens[kt] === " " ? kt + 1 : kt; // allow space
+            const [v, vt] = ExprSingle.parse(tokens, tail);
+            tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+            r.push([k, v]);
+        } while (tokens[tail] === "," && tail++);
+
+        if (tokens[tail] !== "}") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'}' of MapCons");
+        }
+
+        return [new MapCons(r), tail + 1];
+    }
+
+    public constructor(public mappings: Array<[TExprSingle, TExprSingle]>) {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("[");
+        let fst = true;
+        for (const a of this.mappings) {
+            if (fst) {
+                fst = false;
+            } else {
+                pushable.push(",", " ");
+            }
+            a[0].render(pushable);
+            pushable.push(" ", ":", " ");
+            a[0].render(pushable);
         }
         pushable.push("]");
         return pushable;
@@ -1156,7 +1199,7 @@ class FunctionCall implements IXPathGrammar {
         return [new FunctionCall(name, args), tr];
     }
 
-    public constructor(public name: EQName, public args: Array<ExprSingle | ArgumentPlaceholder>) {}
+    public constructor(public name: EQName, public args: Array<TExprSingle | ArgumentPlaceholder>) {}
     public render<T extends IPushable>(pushable: T): T {
         this.name.render(pushable);
         pushable.push("(");
@@ -1379,8 +1422,8 @@ class SequenceType implements IXPathGrammar {
 }
 
 type TItemType = EmptyItemType;
-class ItemType implements IXPathGrammar {
-    public static parse(tokens: string[], usedTokens: number): [TItemType, number] {
+const ItemType = {
+    parse(tokens: string[], usedTokens: number): [TItemType, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
         if (tokens[tail] === "items"
                 && (tokens[tail + 1] === " " ? tokens[tail + 2] : tokens[tail + 1]) === "(") {
@@ -1391,30 +1434,14 @@ class ItemType implements IXPathGrammar {
             }
             return [EmptyItemType.instance, tail + 1];
         }
-        const [e, t] = ItemType.parse(tokens, tail);
+        const [e, t] = KindTest.parse(tokens, tail);
         const hasocc = tokens[t] === "?" || tokens[t] === "+" || tokens[t] === "*";
         const occ = hasocc ? tokens[t] as "?" | "*" | "+" : undefined;
         return  [new SequenceType(e, occ), hasocc ? t + 1 : t];
-    }
+    },
+};
 
-    /**
-     * Push the tokens for this expression to an object.
-     * @template T
-     * @param {T} pushable the object to `push` to
-     * @returns {T}
-     */
-    public render<T extends IPushable>(pushable: T): T {
-        this.itemType.render(pushable);
-        if (this.occurrence) {
-            pushable.push(this.occurrence);
-        }
-        return pushable;
-    }
-
-    public toString() {
-        return this.render([]).join("");
-    }
-}
+type TKindTest = DocumentTest | ElementTest | AttributeTest | SchemaElementTest | SchemaAttributeTest | PITest | CommentTest | TextTest | NamespaceNodeTest | AnyKindTest;
 
 abstract class NumericLiteral implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [TNumericLiteral, number] {
@@ -1618,7 +1645,7 @@ class SimpleBinding implements IXPathGrammar {
         }
     }
 
-    public constructor(public varName: EQName, public expression: ExprSingle, public defToken: string = ":=") {}
+    public constructor(public varName: EQName, public expression: TExprSingle, public defToken: string = ":=") {}
 
     /**
      * Push the tokens for this expression to an object.
