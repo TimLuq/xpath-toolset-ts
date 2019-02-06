@@ -1,13 +1,14 @@
 // tslint:disable:max-classes-per-file
 
 import {
+    ChainOperativeExpr, FollowingUnaryOpExpr,
     IPushable, IXPathGrammar,
-
-    MultiOperativeExpr, SingleOperativeExpr,
-    XPathParseError, XPathUnexpectedTokenError, FollowingUnaryOpExpr, ChainOperativeExpr, LeadingUnaryOpExpr,
+    LeadingUnaryOpExpr, MultiOperativeExpr, SingleOperativeExpr,
+    XPathParseError, XPathUnexpectedTokenError, IXPathParser,
 } from "./xpath-ast-patterns";
-import { Decie } from "../helpers/decie";
+
 import { Biggie, IBiggie } from "../helpers/biggie";
+import { Decie } from "../helpers/decie";
 
 class Expr implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [Expr, number] {
@@ -648,10 +649,18 @@ class EmptySequenceType implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [ContextItemExpr, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
-        if (tokens[tail] !== "empty-sequence" || tokens[tail + 1] !== "(" || tokens[tail + 2] !== ")") {
+        if (tokens[tail] !== "empty-sequence") {
             throw new XPathUnexpectedTokenError(tokens, tail, "['empty-sequence', '(', ')'] of EmptySequenceType");
         }
-        return [EmptySequenceType.instance, tail + 3];
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail ] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of EmptyItemType");
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of EmptyItemType");
+        }
+        return [EmptySequenceType.instance, tail + 1];
     }
 
     private constructor() {}
@@ -667,13 +676,21 @@ class EmptySequenceType implements IXPathGrammar {
 class EmptyItemType implements IXPathGrammar {
 
     public static readonly instance = new EmptyItemType();
-    public static parse(tokens: string[], usedTokens: number): [ContextItemExpr, number] {
+    public static parse(tokens: string[], usedTokens: number): [EmptyItemType, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
-        if (tokens[tail] !== "item" || tokens[tail + 1] !== "(" || tokens[tail + 2] !== ")") {
+        if (tokens[tail] !== "item") {
             throw new XPathUnexpectedTokenError(tokens, tail, "['item', '(', ')'] of EmptyItemType");
         }
-        return [EmptyItemType.instance, tail + 3];
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail ] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of EmptyItemType");
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of EmptyItemType");
+        }
+        return [EmptyItemType.instance, tail + 1];
     }
 
     private constructor() {}
@@ -684,6 +701,133 @@ class EmptyItemType implements IXPathGrammar {
     }
 
     public toString() { return "item()"; }
+}
+
+class AnyKindTest implements IXPathGrammar {
+
+    public static readonly instance = new AnyKindTest();
+    public static parse(tokens: string[], usedTokens: number): [AnyKindTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "node") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['node', '(', ')'] of AnyKindTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of AnyKindTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of AnyKindTest");
+        }
+        return [AnyKindTest.instance, tail + 1];
+    }
+
+    private constructor() {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("node", "(", ")");
+        return pushable;
+    }
+
+    public toString() { return "node()"; }
+}
+
+class TextTest implements IXPathGrammar {
+
+    public static readonly instance = new TextTest();
+    public static parse(tokens: string[], usedTokens: number): [TextTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== "text") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['text', '(', ')'] of TextTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of TextTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of TextTest");
+        }
+        return [TextTest.instance, tail + 1];
+    }
+
+    private constructor() {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("text", "(", ")");
+        return pushable;
+    }
+
+    public toString() { return "text()"; }
+}
+
+class NamespaceNodeTest implements IXPathGrammar {
+
+    public static readonly instance = new NamespaceNodeTest();
+    public static parse(tokens: string[], usedTokens: number): [NamespaceNodeTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== "namespace-node") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['namespace-node', '(', ')'] of NamespaceNodeTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of NamespaceNodeTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of NamespaceNodeTest");
+        }
+        return [NamespaceNodeTest.instance, tail + 1];
+    }
+
+    private constructor() {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("namespace-node", "(", ")");
+        return pushable;
+    }
+
+    public toString() { return "namespace-node()"; }
+}
+
+class CommentTest implements IXPathGrammar {
+
+    public static readonly instance = new CommentTest();
+    public static parse(tokens: string[], usedTokens: number): [CommentTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== "comment") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['comment', '(', ')'] of CommentTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "['(', ')'] of CommentTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of CommentTest");
+        }
+        return [CommentTest.instance, tail + 1];
+    }
+
+    private constructor() {}
+
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("comment", "(", ")");
+        return pushable;
+    }
+
+    public toString() { return "comment()"; }
 }
 
 function parseArgumentList(tokens: string[], usedTokens: number): [Array<TExprSingle | ArgumentPlaceholder>, number] {
@@ -918,7 +1062,32 @@ class RelativePathExpr extends MultiOperativeExpr<TStepExpr, "/" | "//"> {
     }
 }
 
-type TTStepExpr = TPostfixExpr | TAxisStep;
+type TPostfixExpr = PostfixExpr | PrimaryExpr;
+class PostfixExpr implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number): [TRelativePathExpr, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const [pe, pt] = PrimaryExpr.parse(tokens, tail);
+        tail = tokens[pt] === " " ? pt + 1 : pt;
+        if (tokens[tail] === "[") {
+            const [xe, xp] = Predicate.parse(tokens, tail);
+            return [new PostfixExpr(pe, xp), xp];
+        }
+        if (tokens[tail] === "(") {
+            const [xe, xp] = Argum.parse(tokens, tail);
+            return [new PostfixExpr(pe, xp), xp];
+        }
+        if ((tokens[tail + 1] === "::" || (tokens[tail + 1] === " " && tokens[tail + 2] === "::")) && (
+            AxisStep.forwardKeywords.indexOf(tokens[tail] as any) !== -1 ||
+            AxisStep.reverseKeywords.indexOf(tokens[tail] as any) !== -1
+        )) {
+            return AxisStep.parse(tokens, tail);
+        }
+        return MultiOperativeExpr.parseOp<EQName, "/" | "//">(RelativePathExpr, StepExpr, tokens, usedTokens);
+    }
+}
+
+type TStepExpr = TPostfixExpr | TAxisStep;
 const StepExpr = {
     parse(tokens: string[], usedTokens: number): [TRelativePathExpr, number] {
         let tail = usedTokens;
@@ -948,7 +1117,7 @@ class AxisStep {
         "parent", "ancestor", "preceding-sibling", "preceding", "ancestor-or-self",
     ];
     public static parse(tokens: string[], usedTokens: number): [AxisStep, number] {
-
+        
     }
 }
 
@@ -1421,27 +1590,636 @@ class SequenceType implements IXPathGrammar {
     }
 }
 
-type TItemType = EmptyItemType;
+class ParenthesizedItemType implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number): [ParenthesizedItemType, number] {
+        let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of ParenthesizedItemType");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        const [v, vt] = ItemType.parse(tokens, tail);
+        tail = vt;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ParenthesizedItemType");
+        }
+        return [new ParenthesizedItemType(v), tail + 1];
+    }
+
+    public constructor(public itemType: TItemType) {}
+
+    /**
+     * Push the tokens for this expression to an object.
+     * @template T
+     * @param {T} pushable the object to `push` to
+     * @returns {T}
+     */
+    public render<T extends IPushable>(pushable: T): T {
+        pushable.push("(");
+        this.itemType.render(pushable);
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() {
+        return this.render([]).join("");
+    }
+}
+
+type TItemType = EmptyItemType | EQName | ParenthesizedItemType | TFunctionTest | TMapTest | TArrayTest | TKindTest;
 const ItemType = {
     parse(tokens: string[], usedTokens: number): [TItemType, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (tokens[tail] === "items"
-                && (tokens[tail + 1] === " " ? tokens[tail + 2] : tokens[tail + 1]) === "(") {
-            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
-            tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
-            if (tokens[tail] !== ")") {
-                throw new XPathUnexpectedTokenError(tokens, tail, "')' of ItemType");
-            }
-            return [EmptyItemType.instance, tail + 1];
+        if (tokens[tail] === "(") {
+            return ParenthesizedItemType.parse(tokens, tail);
         }
-        const [e, t] = KindTest.parse(tokens, tail);
-        const hasocc = tokens[t] === "?" || tokens[t] === "+" || tokens[t] === "*";
-        const occ = hasocc ? tokens[t] as "?" | "*" | "+" : undefined;
-        return  [new SequenceType(e, occ), hasocc ? t + 1 : t];
+        if (tokens[tail + 1] === "(" || (tokens[tail + 1] === " " && tokens[tail + 2] === "(")) {
+            const fn = tokens[tail];
+            if (fn === "item") {
+                tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+                tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+                if (tokens[tail] !== ")") {
+                    throw new XPathUnexpectedTokenError(tokens, tail, "')' of ItemType");
+                }
+                return [EmptyItemType.instance, tail + 1];
+            }
+            if (fn === "function") {
+                return FunctionTest.parse(tokens, tail);
+            }
+            if (fn === "map") {
+                return MapTest.parse(tokens, tail);
+            }
+            if (fn === "array") {
+                return ArrayTest.parse(tokens, tail);
+            }
+            if (KindTest.hasKind(fn)) {
+                return KindTest.parse(tokens, tail);
+            }
+        }
+        return EQName.parse(tokens, tail);
     },
 };
 
-type TKindTest = DocumentTest | ElementTest | AttributeTest | SchemaElementTest | SchemaAttributeTest | PITest | CommentTest | TextTest | NamespaceNodeTest | AnyKindTest;
+type TFunctionTest = FunctionTest<SequenceType[], SequenceType> | Readonly<FunctionTest<Wildcard, undefined>>;
+class FunctionTest<
+    T extends SequenceType[] | Wildcard,
+    R extends SequenceType | undefined
+> implements IXPathGrammar {
+    public static readonly anyFunction = Object.freeze(
+        new FunctionTest<Wildcard, undefined>(Wildcard.instance, undefined),
+    );
+
+    public static parse(tokens: string[], usedTokens: number): [TFunctionTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "function") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['function', '('] of FunctionTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of FunctionTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] === "*") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            if (tokens[tail] !== ")") {
+                throw new XPathUnexpectedTokenError(tokens, tail, "')' of FunctionTest");
+            }
+            return [FunctionTest.anyFunction, tail + 1];
+        }
+        const args: SequenceType[] = [];
+
+        if (tokens[tail] !== ")") {
+            do {
+                tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+                const [a, t] = SequenceType.parse(tokens, tail);
+                args.push(a);
+                tail = tokens[t] === " " ? t + 1 : t; // allow space
+            } while (tokens[tail] === "," && tail++);
+        }
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of FunctionTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "as") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'as' of FunctionTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [r, rt] = SequenceType.parse(tokens, tail + 1);
+
+        return [new FunctionTest(args, r), rt];
+    }
+
+    private constructor(public args: T, public ret: R) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("function", "(");
+        if (this.args instanceof Wildcard) {
+            pushable.push("*");
+        } else {
+            let fst = true;
+            for (const a of (this.args as SequenceType[])) {
+                if (fst) {
+                    fst = false;
+                } else {
+                    pushable.push(",", " ");
+                }
+                a.render(pushable);
+            }
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+class DocumentTest implements IXPathGrammar {
+    public static parse(tokens: string[], usedTokens: number): [DocumentTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] !== "document-node") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['document-node', '('] of DocumentTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of DocumentTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        let v: undefined | TElementTest | SchemaElementTest;
+        if (tokens[tail] === "element") {
+            const [vv, vt] = ElementTest.parse(tokens, tail);
+            v = vv;
+            tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+        } else if (tokens[tail] === "element-schema") {
+            const [vv, vt] = ElementTest.parse(tokens, tail);
+            v = vv;
+            tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+        }
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "')' of DocumentTest",
+            );
+        }
+        return [new DocumentTest(v), tail + 1];
+    }
+
+    private constructor(public root: undefined | TElementTest | SchemaElementTest) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("document-node", "(");
+        if (this.root) {
+            this.root.render(pushable);
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+type TAttributeTest
+    = AttributeTest<EQName, EQName | undefined>
+    | AttributeTest<Wildcard, EQName> | Readonly<AttributeTest<Wildcard>>;
+
+class AttributeTest<
+    N extends EQName | Wildcard,
+    T extends EQName | undefined = undefined
+> implements IXPathGrammar {
+    public static readonly anyAttribute = Object.freeze(
+        new AttributeTest<Wildcard>(Wildcard.instance, undefined),
+    );
+
+    public static parse(tokens: string[], usedTokens: number): [TAttributeTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "attribute") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['attribute', '('] of AttributeTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of AttributeTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] === ")") {
+            return [AttributeTest.anyAttribute, tail + 1];
+        }
+        let n: Wildcard | EQName;
+        if (tokens[tail] === "*") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            if (tokens[tail] === ")") {
+                return [ElementTest.anyElement, tail + 1];
+            }
+            n = Wildcard.instance;
+        } else {
+            const [tv, tp] = EQName.parse(tokens, tail);
+            n = tv;
+            tail = tp;
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] === ")") {
+            return [new AttributeTest(n, undefined), tail + 1];
+        }
+        if (tokens[tail] !== ",") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "',' of ElementTest");
+        }
+        tail = tokens[tail] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [t, vt] = EQName.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ElementTest");
+        }
+        return [new AttributeTest(n, t), tail + 1];
+    }
+
+    private constructor(public name: N, public type: T) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("element", "(");
+        this.name.render(pushable);
+        if (this.type) {
+            pushable.push(",", " ");
+            this.type.render(pushable);
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+type TElementTest
+    = ElementTest<EQName, EQName | undefined>
+    | ElementTest<Wildcard, EQName> | Readonly<ElementTest<Wildcard>>;
+class ElementTest<
+    N extends EQName | Wildcard,
+    T extends EQName | undefined = undefined
+> implements IXPathGrammar {
+    public static readonly anyElement = Object.freeze(
+        new ElementTest<Wildcard>(Wildcard.instance, undefined),
+    );
+
+    public static parse(tokens: string[], usedTokens: number): [TElementTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "element") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['map', '('] of ElementTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of ElementTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] === ")") {
+            return [ElementTest.anyElement, tail + 1];
+        }
+        let n: Wildcard | EQName;
+        if (tokens[tail] === "*") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            if (tokens[tail] === ")") {
+                return [ElementTest.anyElement, tail + 1];
+            }
+            n = Wildcard.instance;
+        } else {
+            const [tv, tp] = EQName.parse(tokens, tail);
+            n = tv;
+            tail = tp;
+        }
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        if (tokens[tail] === ")") {
+            return [new ElementTest(n, undefined), tail + 1];
+        }
+        if (tokens[tail] !== ",") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "',' of ElementTest");
+        }
+        tail = tokens[tail] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [t, vt] = EQName.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        let tn = false;
+        if (tokens[tail] === "?") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            tn = true;
+        }
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ElementTest");
+        }
+        return [new ElementTest(n, t, tn), tail + 1];
+    }
+
+    private constructor(public name: N, public type: T, public typeNullable: boolean = true) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("element", "(");
+        this.name.render(pushable);
+        if (this.type) {
+            pushable.push(",", " ");
+            this.type.render(pushable);
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+type TMapTest = MapTest<[EQName, SequenceType]> | Readonly<MapTest<Wildcard>>;
+class MapTest<
+    T extends [EQName, SequenceType] | Wildcard
+> implements IXPathGrammar {
+    public static readonly anyMap = Object.freeze(
+        new MapTest<Wildcard>(Wildcard.instance),
+    );
+
+    public static parse(tokens: string[], usedTokens: number): [TMapTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "map") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['map', '('] of MapTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of MapTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] === "*") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            if (tokens[tail] !== ")") {
+                throw new XPathUnexpectedTokenError(tokens, tail, "')' of MapTest");
+            }
+            return [MapTest.anyMap, tail + 1];
+        }
+
+        const [k, kt] = EQName.parse(tokens, tail);
+        tail = tokens[kt] === " " ? kt + 1 : kt; // allow space
+
+        if (tokens[tail] !== ",") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "',' of MapTest");
+        }
+        tail = tokens[tail] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [v, vt] = SequenceType.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of MapTest");
+        }
+        return [new MapTest([k, v]), tail + 1];
+    }
+
+    private constructor(public type: T) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("map", "(");
+        if (this.type instanceof Wildcard) {
+            pushable.push("*");
+        } else {
+            let fst = true;
+            for (const a of (this.type as SequenceType[])) {
+                if (fst) {
+                    fst = false;
+                } else {
+                    pushable.push(",", " ");
+                }
+                a.render(pushable);
+            }
+        }
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+type TArrayTest = ArrayTest<SequenceType> | Readonly<ArrayTest<Wildcard>>;
+class ArrayTest<
+    T extends SequenceType | Wildcard
+> implements IXPathGrammar {
+    public static readonly anyArray = Object.freeze(
+        new ArrayTest<Wildcard>(Wildcard.instance),
+    );
+
+    public static parse(tokens: string[], usedTokens: number): [TArrayTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "array") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['array', '('] of ArrayTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of ArrayTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] === "*") {
+            tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+            if (tokens[tail] !== ")") {
+                throw new XPathUnexpectedTokenError(tokens, tail, "')' of ArrayTest");
+            }
+            return [ArrayTest.anyArray, tail + 1];
+        }
+
+        const [v, vt] = SequenceType.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ArrayTest");
+        }
+        return [new ArrayTest(v), tail + 1];
+    }
+
+    private constructor(public type: T) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("array", "(");
+        this.type.render(pushable);
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+class SchemaElementTest implements IXPathGrammar {
+
+    public static parse(tokens: string[], usedTokens: number): [SchemaElementTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "schema-element") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['schema-element', '('] of SchemaElementTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of SchemaElementTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [v, vt] = EQName.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of SchemaElementTest");
+        }
+        return [new SchemaElementTest(v), tail + 1];
+    }
+
+    private constructor(public name: EQName) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("schema-element", "(");
+        this.name.render(pushable);
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+class SchemaAttributeTest implements IXPathGrammar {
+
+    public static parse(tokens: string[], usedTokens: number): [SchemaAttributeTest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "schema-attribute") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['schema-attribute', '('] of SchemaAttributeTest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of SchemaAttributeTest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [v, vt] = EQName.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of SchemaAttributeTest");
+        }
+        return [new SchemaAttributeTest(v), tail + 1];
+    }
+
+    private constructor(public name: EQName) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("schema-attribute", "(");
+        this.name.render(pushable);
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+class PITest implements IXPathGrammar {
+
+    public static parse(tokens: string[], usedTokens: number): [PITest, number] {
+        let tail = usedTokens;
+        tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
+        const t0 = tail;
+        if (tokens[tail] !== "processing-instruction") {
+            throw new XPathUnexpectedTokenError(
+                tokens, usedTokens,
+                "['processing-instruction', '('] of PITest",
+            );
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+        if (tokens[tail] !== "(") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of PITest");
+        }
+        tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
+
+        const [v, vt] = EQName.parse(tokens, tail);
+        tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
+
+        if (tokens[tail] !== ")") {
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of PITest");
+        }
+        return [new PITest(v), tail + 1];
+    }
+
+    private constructor(public name: EQName) {}
+
+    public render<P extends IPushable>(pushable: P): P {
+        pushable.push("processing-instruction", "(");
+        this.name.render(pushable);
+        pushable.push(")");
+        return pushable;
+    }
+
+    public toString() { return this.render([]).join(""); }
+}
+
+type TKindTest
+    = DocumentTest | TElementTest | TAttributeTest | SchemaElementTest | SchemaAttributeTest
+    | PITest | CommentTest | TextTest | NamespaceNodeTest | AnyKindTest;
+const KindTest = {
+    kinds: {
+        "attribute": AttributeTest,
+        "document-node": DocumentTest,
+        "element": ElementTest,
+        "processing-instruction": PITest,
+        "schema-attribute": SchemaAttributeTest,
+        "schema-element": SchemaElementTest,
+
+        "comment": CommentTest,
+        "namespace-node": NamespaceNodeTest,
+        "node": AnyKindTest,
+        "text": TextTest,
+    } as { [k: string]: IXPathParser<TKindTest>; },
+    get kindNames() {
+        return Object.keys(this.kinds);
+    },
+    hasKind(name: string) {
+        return Boolean(this.kinds[name]);
+    },
+    parse(tokens: string[], usedTokens: number): [TKindTest, number] {
+        const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
+
+        const f = this.kinds[tokens[tail]];
+        if (!f) {
+            const avail = this.kindNames.map((x) => "'" + x + "'").join(" | ");
+            throw new XPathUnexpectedTokenError(tokens, tail,  avail + " of ItemType");
+        }
+        return f.parse(tokens, tail);
+    },
+};
 
 abstract class NumericLiteral implements IXPathGrammar {
     public static parse(tokens: string[], usedTokens: number): [TNumericLiteral, number] {

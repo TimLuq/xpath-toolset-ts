@@ -1,13 +1,19 @@
 
 // tslint:disable:max-classes-per-file
 
-export class XPathParseError extends Error {
-    public constructor(public code: string, message: string, public tokens?: string[], public token?: number) {
+export class XPathError<C extends string = string> extends Error {
+    public constructor(public code: C, message: string) {
         super(message);
     }
 }
 
-export class XPathUnexpectedTokenError extends XPathParseError {
+export class XPathParseError<C extends string = string> extends XPathError<C> {
+    public constructor(code: C, message: string, public tokens?: string[], public token?: number) {
+        super(code, message);
+    }
+}
+
+export class XPathUnexpectedTokenError extends XPathParseError<"parse-token"> {
     public expected: string | undefined;
     public constructor(tokens: string[], token: number, expected?: string) {
         const t = tokens[token];
