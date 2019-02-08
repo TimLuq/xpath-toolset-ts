@@ -30,7 +30,8 @@ export interface IPushable {
     push(...tokens: string[]): any;
 }
 
-export interface IXPathGrammar {
+export interface IXPathGrammar<SyntaxType extends string> {
+    readonly syntaxType: SyntaxType;
     /**
      * Push the tokens for this expression to an object.
      * @template T
@@ -40,13 +41,14 @@ export interface IXPathGrammar {
     render<T extends IPushable>(pushable: T): T;
 }
 
-export interface IXPathParser<E extends IXPathGrammar> {
+export interface IXPathParser<S extends string, E extends IXPathGrammar<S> = IXPathGrammar<S>> {
     parse(tokens: string[], usedTokens: number): [E, number];
 }
 
 export interface ISingleOpExprInst<
-    L extends IXPathGrammar, R extends IXPathGrammar,
-    T extends SingleOperativeExpr<L, R> = SingleOperativeExpr<L, R>,
+    S extends string,
+    L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+    T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
 > {
     readonly operator: string[];
     new(left: L, op?: null, right?: null): T;
@@ -56,13 +58,15 @@ export interface ISingleOpExprInst<
 }
 
 export abstract class SingleOperativeExpr<
-    E extends IXPathGrammar, R extends IXPathGrammar,
-> implements IXPathGrammar {
+    S extends string,
+    E extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+> implements IXPathGrammar<S> {
 
     protected static parseSingleOp<
-        L extends IXPathGrammar, R extends IXPathGrammar,
-        T extends SingleOperativeExpr<L, R> = SingleOperativeExpr<L, R>,
-        C extends ISingleOpExprInst<L, R> = ISingleOpExprInst<L, R>
+        S extends string,
+        L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+        T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
+        C extends ISingleOpExprInst<S, L, R> = ISingleOpExprInst<S, L, R>
     >(
         clss: C,
         tokens: string[],
@@ -89,8 +93,13 @@ export abstract class SingleOperativeExpr<
 
         return [new clss(fst, op, r), tail] as [T, number];
     }
+    public abstract readonly syntaxType: S;
 
-    public constructor(public first: E, public operator?: string[] | null, public right?: R | null) {}
+    public constructor(
+        public first: E,
+        public operator?: string[] | null,
+        public right?: R | null,
+    ) {}
 
     public render<T extends IPushable>(pushable: T): T {
         this.first.render(pushable);
@@ -110,13 +119,19 @@ export abstract class SingleOperativeExpr<
 }
 
 export interface IUnaryOpExprInst<
-    E extends IXPathGrammar, O extends string, T extends UnaryOpExpr<E, O> = UnaryOpExpr<E, O>
+    S extends string,
+    E extends IXPathGrammar<string>, O extends string, T extends UnaryOpExpr<S, E, O> = UnaryOpExpr<S, E, O>
 > {
     readonly operator: O;
     new(fst: E, op?: O | null): T;
 }
 
-abstract class UnaryOpExpr<E extends IXPathGrammar, O extends string> implements IXPathGrammar {
+abstract class UnaryOpExpr<
+    S extends string,
+    E extends IXPathGrammar<string>,
+    O extends string
+> implements IXPathGrammar<S> {
+    public abstract readonly syntaxType: S;
     public abstract render<T extends IPushable>(pushable: T): T;
 
     public toString() {
@@ -124,15 +139,19 @@ abstract class UnaryOpExpr<E extends IXPathGrammar, O extends string> implements
     }
 }
 
-export abstract class FollowingUnaryOpExpr<E extends IXPathGrammar, O extends string> extends UnaryOpExpr<E, O> {
+export abstract class FollowingUnaryOpExpr<
+    S extends string,
+    E extends IXPathGrammar<string>,
+    O extends string
+> extends UnaryOpExpr<S, E, O> {
 
     protected static parseFollowing<
-        E extends IXPathGrammar, O extends string,
-        T extends FollowingUnaryOpExpr<E, O> = FollowingUnaryOpExpr<E, O>,
-        C extends IUnaryOpExprInst<E, O> = IUnaryOpExprInst<E, O, T>
+        E extends IXPathGrammar<string>, O extends string,
+        T extends FollowingUnaryOpExpr<string, E, O> = FollowingUnaryOpExpr<string, E, O>,
+        C extends IUnaryOpExprInst<string, E, O> = IUnaryOpExprInst<string, E, O, T>
     >(
         clss: C,
-        childClss: IXPathParser<E>,
+        childClss: IXPathParser<string, E>,
         tokens: string[],
         usedTokens: number,
     ) {
@@ -149,6 +168,7 @@ export abstract class FollowingUnaryOpExpr<E extends IXPathGrammar, O extends st
         return [new clss(fst, clss.operator), tail + 1] as [T, number];
     }
 
+    public abstract readonly syntaxType: S;
     public constructor(public first: E, public operator?: O | null) {
         super();
     }
@@ -162,15 +182,19 @@ export abstract class FollowingUnaryOpExpr<E extends IXPathGrammar, O extends st
     }
 }
 
-export abstract class LeadingUnaryOpExpr<E extends IXPathGrammar, O extends string> extends UnaryOpExpr<E, O> {
+export abstract class LeadingUnaryOpExpr<
+    S extends string,
+    E extends IXPathGrammar<S>,
+    O extends string
+> extends UnaryOpExpr<S, E, O> {
 
     protected static parseLeading<
-        E extends IXPathGrammar, O extends string,
-        T extends LeadingUnaryOpExpr<E, O> = LeadingUnaryOpExpr<E, O>,
-        C extends IUnaryOpExprInst<E, O> = IUnaryOpExprInst<E, O, T>
+        E extends IXPathGrammar<string>, O extends string,
+        T extends LeadingUnaryOpExpr<string, E, O> = LeadingUnaryOpExpr<string, E, O>,
+        C extends IUnaryOpExprInst<string, E, O, T> = IUnaryOpExprInst<string, E, O, T>
     >(
         clss: C,
-        childClss: IXPathParser<E>,
+        childClss: IXPathParser<E["syntaxType"], E>,
         tokens: string[],
         usedTokens: number,
     ) {
@@ -201,28 +225,53 @@ export abstract class LeadingUnaryOpExpr<E extends IXPathGrammar, O extends stri
 }
 
 export interface IChainOpExprInst<
-    L extends IXPathGrammar, O extends string, R extends IXPathGrammar,
-    T extends ChainOperativeExpr<L, O, R> = ChainOperativeExpr<L, O, R>,
+    X extends true | false,
+    L extends IXPathGrammar<string>, O extends string, R extends IXPathGrammar<string>,
+    T extends ChainOperativeExpr<string, L, O, R> = ChainOperativeExpr<string, L, O, R>,
 > {
+    readonly collapse: X;
     readonly operators: O[];
     new(fst: L, rest: Array<[O, R]>): T;
 }
 
 export abstract class ChainOperativeExpr<
-    L extends IXPathGrammar, O extends string, R extends IXPathGrammar,
-> implements IXPathGrammar {
+    S extends string,
+    L extends IXPathGrammar<string>, O extends string, R extends IXPathGrammar<string>,
+> implements IXPathGrammar<S> {
 
     protected static parseChain<
-        L extends IXPathGrammar, O extends string, R extends IXPathGrammar,
-        T extends ChainOperativeExpr<L, O, R> = ChainOperativeExpr<L, O, R>,
-        C extends IChainOpExprInst<L, O, R> = IChainOpExprInst<L, O, R, T>,
+        L extends IXPathGrammar<string>, O extends string, R extends IXPathGrammar<string>,
+        T extends ChainOperativeExpr<string, L, O, R> = ChainOperativeExpr<string, L, O, R>,
+        C extends IChainOpExprInst<true, L, O, R, T> = IChainOpExprInst<true, L, O, R, T>,
     >(
         clss: C,
-        leftClss: IXPathParser<L>,
-        restClss: IXPathParser<R>,
+        leftClss: IXPathParser<L["syntaxType"], L>,
+        restClss: IXPathParser<R["syntaxType"], R>,
         tokens: string[],
         usedTokens: number,
-    ) {
+    ): [T | L, number];
+    protected static parseChain<
+        L extends IXPathGrammar<string>, O extends string, R extends IXPathGrammar<string>,
+        T extends ChainOperativeExpr<string, L, O, R> = ChainOperativeExpr<string, L, O, R>,
+        C extends IChainOpExprInst<false, L, O, R, T> = IChainOpExprInst<false, L, O, R, T>,
+    >(
+        clss: C,
+        leftClss: IXPathParser<L["syntaxType"], L>,
+        restClss: IXPathParser<R["syntaxType"], R>,
+        tokens: string[],
+        usedTokens: number,
+    ): [T, number];
+    protected static parseChain<
+        L extends IXPathGrammar<string>, O extends string, R extends IXPathGrammar<string>,
+        T extends ChainOperativeExpr<string, L, O, R> = ChainOperativeExpr<string, L, O, R>,
+        C extends IChainOpExprInst<boolean, L, O, R, T> = IChainOpExprInst<boolean, L, O, R, T>,
+    >(
+        clss: C,
+        leftClss: IXPathParser<L["syntaxType"], L>,
+        restClss: IXPathParser<R["syntaxType"], R>,
+        tokens: string[],
+        usedTokens: number,
+    ): [T | L, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
 
@@ -238,9 +287,14 @@ export abstract class ChainOperativeExpr<
             tail = tokens[t] === " " ? t + 1 : t; // allow space
         }
 
+        if (clss.collapse && r.length === 0) {
+            return [fst, tail];
+        }
+
         return [new clss(fst, r), tail] as [T, number];
     }
 
+    public abstract readonly syntaxType: S;
     public constructor(public first: L, public rest: Array<[O, R]>) {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -258,26 +312,47 @@ export abstract class ChainOperativeExpr<
 }
 
 export interface IMultiOpExprInst<
-    E extends IXPathGrammar, O extends string, T extends MultiOperativeExpr<E, O> = MultiOperativeExpr<E, O>
-> extends IChainOpExprInst<E, O, E, T> {
-    readonly operators: O[];
-    new(fst: E, rest: Array<[O, E]>): T;
-}
+    X extends true | false,
+    E extends IXPathGrammar<string>,
+    O extends string,
+    T extends MultiOperativeExpr<string, E, O> = MultiOperativeExpr<string, E, O>
+> extends IChainOpExprInst<X, E, O, E, T> {}
 
 export abstract class MultiOperativeExpr<
-    E extends IXPathGrammar, O extends string,
-> extends ChainOperativeExpr<E, O, E> {
+    S extends string,
+    E extends IXPathGrammar<string>, O extends string,
+> extends ChainOperativeExpr<S, E, O, E> {
 
     protected static parseOp<
-        E extends IXPathGrammar, O extends string,
-        T extends MultiOperativeExpr<E, O> = MultiOperativeExpr<E, O>,
-        C extends IMultiOpExprInst<E, O, T> = IMultiOpExprInst<E, O, T>
+        E extends IXPathGrammar<string>, O extends string,
+        T extends MultiOperativeExpr<string, E, O> = MultiOperativeExpr<string, E, O>,
+        C extends IMultiOpExprInst<true, E, O, T> = IMultiOpExprInst<true, E, O, T>
     >(
         clss: C,
-        childClss: IXPathParser<E>,
+        childClss: IXPathParser<E["syntaxType"], E>,
         tokens: string[],
         usedTokens: number,
-    ) {
-        return ChainOperativeExpr.parseChain<E, O, E, T>(clss, childClss, childClss, tokens, usedTokens);
+    ): [T | E, number];
+    protected static parseOp<
+        E extends IXPathGrammar<string>, O extends string,
+        T extends MultiOperativeExpr<string, E, O> = MultiOperativeExpr<string, E, O>,
+        C extends IMultiOpExprInst<false, E, O, T> = IMultiOpExprInst<false, E, O, T>
+    >(
+        clss: C,
+        childClss: IXPathParser<E["syntaxType"], E>,
+        tokens: string[],
+        usedTokens: number,
+    ): [T, number];
+    protected static parseOp<
+        E extends IXPathGrammar<string>, O extends string,
+        T extends MultiOperativeExpr<string, E, O> = MultiOperativeExpr<string, E, O>,
+        C extends IMultiOpExprInst<true | false, E, O, T> = IMultiOpExprInst<true | false, E, O, T>
+    >(
+        clss: C,
+        childClss: IXPathParser<E["syntaxType"], E>,
+        tokens: string[],
+        usedTokens: number,
+    ): [T | E, number] {
+        return ChainOperativeExpr.parseChain<E, O, E, T>(clss as any, childClss, childClss, tokens, usedTokens);
     }
 }

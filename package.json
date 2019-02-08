@@ -2,7 +2,9 @@
   "name": "xpath-toolset",
   "version": "0.0.1",
   "description": "XPath toolset to work with and process XPath expressions.",
-  "main": "build/xpath-toolset",
+  "main": "build/cjs/xpath-toolset.js",
+  "browser": "build/umd/xpath-toolset.js",
+  "module": "build/esm/xpath-toolset.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/TimLuq/xpath-toolset-ts.git"
@@ -15,7 +17,7 @@
     "name": "TimLuq",
     "url": "https://github.com/TimLuq"
   },
-  "license": "LGPLv3",
+  "license": "LGPL-3.0-or-later",
   "devDependencies": {
     "@babel/core": "^7.2.2",
     "@babel/plugin-proposal-class-properties": "^7.3.0",
@@ -28,5 +30,9 @@
     "rollup-plugin-babel": "^4.3.2",
     "rollup-plugin-sourcemaps": "^0.4.2",
     "rollup-plugin-terser": "^4.0.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && rollup -c",
+    "prepare": "tsc -p tsconfig.json && rollup -c"
   }
 }

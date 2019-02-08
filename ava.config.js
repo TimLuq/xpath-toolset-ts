@@ -21,6 +21,6 @@ export default {
     // extensions: ["ts", "js"],
     files: ["./tests/**/*.spec.ts"],
     require: [
-        "./tests/_register.js"
+        // "./tests/_register.js"
     ]
 };

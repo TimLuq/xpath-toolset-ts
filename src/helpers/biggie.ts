@@ -26,6 +26,7 @@ export interface IBiggie {
 
     toDouble(): number;
     toString(): string;
+    toJSON(): string | number;
 }
 
 // tslint:disable-next-line:interface-name
@@ -151,6 +152,11 @@ if (typeof BigInt !== "undefined") {
         }
         public toString(): string {
             return this.value.toString();
+        }
+        public toJSON(): string | number {
+            return this.value <= 0x7FFFFFFF
+                ? Number(this.value)
+                : this.value.toString();
         }
     };
     (biggie as any).zero = new biggie(0);

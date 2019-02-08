@@ -209,4 +209,9 @@ export class Decie {
         const p = s.length - this.precision;
         return s.substring(0, p) + "." + (this.precision === 0 ? "0" : s.substring(p));
     }
+    public toJSON(): string | number {
+        return this.precision <= 0
+            ? this.integer.toJSON()
+            : this.toString();
+    }
 }
