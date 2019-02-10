@@ -48,11 +48,12 @@ export interface IXPathParser<S extends string, E extends IXPathGrammar<S> = IXP
 export interface ISingleOpExprInst<
     S extends string,
     L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+    X extends true | false,
     T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
 > {
     readonly operator: string[];
-    new(left: L, op?: null, right?: null): T;
-    new(left: L, op: string[], right: R): T;
+    readonly collapse: X;
+    new(left: L, op: X extends true ? string[] : string[] | undefined, right: X extends true ? R : R | undefined): T;
     parseLeft(tokens: string[], usedTokens: number): [L, number];
     parseRight(tokens: string[], usedTokens: number): [R, number];
 }
@@ -63,15 +64,34 @@ export abstract class SingleOperativeExpr<
 > implements IXPathGrammar<S> {
 
     protected static parseSingleOp<
-        S extends string,
         L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
-        T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
-        C extends ISingleOpExprInst<S, L, R> = ISingleOpExprInst<S, L, R>
+        T extends SingleOperativeExpr<string, L, R> = SingleOperativeExpr<string, L, R>,
+        C extends ISingleOpExprInst<string, L, R, true> = ISingleOpExprInst<string, L, R, true>
     >(
         clss: C,
         tokens: string[],
         usedTokens: number,
-    ) {
+    ): [T | L, number];
+    protected static parseSingleOp<
+        S extends string,
+        L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+        T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
+        C extends ISingleOpExprInst<S, L, R, true> = ISingleOpExprInst<S, L, R, true>
+    >(
+        clss: C,
+        tokens: string[],
+        usedTokens: number,
+    ): [T, number];
+    protected static parseSingleOp<
+        S extends string,
+        L extends IXPathGrammar<string>, R extends IXPathGrammar<string>,
+        T extends SingleOperativeExpr<S, L, R> = SingleOperativeExpr<S, L, R>,
+        C extends ISingleOpExprInst<S, L, R, boolean> = ISingleOpExprInst<S, L, R, boolean>
+    >(
+        clss: C,
+        tokens: string[],
+        usedTokens: number,
+    ): [T | L, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
 
@@ -79,7 +99,10 @@ export abstract class SingleOperativeExpr<
         tail = tokens[ft] === " " ? ft + 1 : ft; // allow space
 
         if (clss.operator[0] !== tokens[tail]) {
-            return [new clss(fst), tail] as [T, number];
+            if (clss.collapse) {
+                return [fst, ft];
+            }
+            return [new clss(fst, undefined, undefined), tail] as [T, number];
         }
         const op: string[] = clss.operator;
         for (const o of op) {
@@ -151,7 +174,7 @@ export abstract class FollowingUnaryOpExpr<
         C extends IUnaryOpExprInst<string, E, O> = IUnaryOpExprInst<string, E, O, T>
     >(
         clss: C,
-        childClss: IXPathParser<string, E>,
+        childClss: IXPathParser<E["syntaxType"], E>,
         tokens: string[],
         usedTokens: number,
     ) {
@@ -184,7 +207,7 @@ export abstract class FollowingUnaryOpExpr<
 
 export abstract class LeadingUnaryOpExpr<
     S extends string,
-    E extends IXPathGrammar<S>,
+    E extends IXPathGrammar<string>,
     O extends string
 > extends UnaryOpExpr<S, E, O> {
 

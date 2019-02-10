@@ -7,8 +7,14 @@ import {
     XPathParseError, XPathUnexpectedTokenError,
 } from "./xpath-ast-patterns";
 
-import { Biggie, IBiggie } from "../helpers/biggie";
-import { Decie } from "../helpers/decie";
+import {
+    IntegerLiteral, nameChar, nameStartChar, NCName, NumericLiteral, StringLiteral, TLiteral,
+} from "./xpath-literals";
+export * from "./xpath-literals";
+
+export type TXPathGrammar
+    = Expr | TExprSingle | SimpleBinding | TEQName | PrimaryExpr
+    | ArrowExpr | ArrowFunctionExpr | ArgumentPlaceholder;
 
 export class Expr implements IXPathGrammar<"Expr"> {
     public static parse(tokens: string[], usedTokens: number): [Expr, number] {
@@ -312,29 +318,26 @@ export class IfExpr implements IXPathGrammar<"IfExpr"> {
 }
 
 export type TOrExpr = OrExpr | TAndExpr;
-export class OrExpr extends MultiOperativeExpr<TAndExpr, "or"> {
+export class OrExpr extends MultiOperativeExpr<"OrExpr", TAndExpr, "or"> {
     public static operators: ["or"] = ["or"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TOrExpr, number] {
-        const r = MultiOperativeExpr.parseOp<TAndExpr, "or">(OrExpr, AndExpr, tokens, usedTokens);
-        if (r[0].rest) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return MultiOperativeExpr.parseOp<TAndExpr, "or", OrExpr>(
+            OrExpr, AndExpr, tokens, usedTokens);
     }
+    public readonly syntaxType = "OrExpr";
 }
 
 export type TAndExpr = AndExpr | TComparisonExpr;
-export class AndExpr extends MultiOperativeExpr<TComparisonExpr, "and"> {
+export class AndExpr extends MultiOperativeExpr<"AndExpr", TComparisonExpr, "and"> {
     public static operators: ["and"] = ["and"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TAndExpr, number] {
-        const r = MultiOperativeExpr.parseOp<TComparisonExpr, "and">(
+        return MultiOperativeExpr.parseOp<TComparisonExpr, "and", AndExpr>(
             AndExpr, ComparisonExpr, tokens, usedTokens,
         );
-        if (r[0].rest) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "AndExpr";
 }
 
 export type TComparisonExpr = ComparisonExpr | TStringConcatExpr;
@@ -401,26 +404,23 @@ export class ComparisonExpr implements IXPathGrammar<"ComparisonExpr"> {
 }
 
 export type TStringConcatExpr = StringConcatExpr | TRangeExpr;
-export class StringConcatExpr extends MultiOperativeExpr<TRangeExpr, "||"> {
+export class StringConcatExpr extends MultiOperativeExpr<"StringConcatExpr", TRangeExpr, "||"> {
     public static operators: ["||"] = ["||"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TStringConcatExpr, number] {
-        const r = MultiOperativeExpr.parseOp<TRangeExpr, "||">(StringConcatExpr, RangeExpr, tokens, usedTokens);
-        if (r[0].rest) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return MultiOperativeExpr.parseOp<TRangeExpr, "||", StringConcatExpr>(
+            StringConcatExpr, RangeExpr, tokens, usedTokens);
     }
+    public readonly syntaxType = "StringConcatExpr";
 }
 
 export type TRangeExpr = RangeExpr | TAdditiveExpr;
-export class RangeExpr extends SingleOperativeExpr<TAdditiveExpr, TAdditiveExpr> {
+export class RangeExpr extends SingleOperativeExpr<"RangeExpr", TAdditiveExpr, TAdditiveExpr> {
     public static readonly operator = ["to"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TRangeExpr, number] {
-        const r = SingleOperativeExpr.parseSingleOp<TAdditiveExpr, TAdditiveExpr>(RangeExpr, tokens, usedTokens);
-        if (r[0].right) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return SingleOperativeExpr.parseSingleOp<TAdditiveExpr, TAdditiveExpr, RangeExpr>(
+            RangeExpr, tokens, usedTokens);
     }
 
     public static parseLeft(tokens: string[], usedTokens: number) {
@@ -429,72 +429,65 @@ export class RangeExpr extends SingleOperativeExpr<TAdditiveExpr, TAdditiveExpr>
     public static parseRight(tokens: string[], usedTokens: number) {
         return AdditiveExpr.parse(tokens, usedTokens);
     }
+    public readonly syntaxType = "RangeExpr";
 }
 
 export type TAdditiveExpr = AdditiveExpr | TMultiplicativeExpr;
-export class AdditiveExpr extends MultiOperativeExpr<TMultiplicativeExpr, "+" | "-"> {
+export class AdditiveExpr extends MultiOperativeExpr<"AdditiveExpr", TMultiplicativeExpr, "+" | "-"> {
     public static readonly operators: ["+", "-"] = ["+", "-"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TAdditiveExpr, number] {
-        const r = super.parseOp<TMultiplicativeExpr, "+" | "-">(
+        return MultiOperativeExpr.parseOp<TMultiplicativeExpr, "+" | "-", AdditiveExpr>(
             AdditiveExpr, MultiplicativeExpr, tokens, usedTokens,
         );
-        if (r[0].rest.length) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "AdditiveExpr";
 }
 
 export type TMultiplicativeExpr = MultiplicativeExpr | TUnionExpr;
-export class MultiplicativeExpr extends MultiOperativeExpr<TUnionExpr, "*" | "div" | "idiv" | "mod"> {
+export class MultiplicativeExpr extends MultiOperativeExpr<
+    "MultiplicativeExpr", TUnionExpr, "*" | "div" | "idiv" | "mod"
+> {
     public static readonly operators: ["*", "div", "idiv", "mod"] = ["*", "div", "idiv", "mod"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TMultiplicativeExpr, number] {
-        const r = super.parseOp<TUnionExpr, "*" | "div" | "idiv" | "mod">(
+        return MultiOperativeExpr.parseOp<TUnionExpr, "*" | "div" | "idiv" | "mod", MultiplicativeExpr>(
             MultiplicativeExpr, UnionExpr, tokens, usedTokens,
         );
-        if (r[0].rest.length) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "MultiplicativeExpr";
 }
 
 export type TUnionExpr = UnionExpr | TIntersectExceptExpr;
-export class UnionExpr extends MultiOperativeExpr<TIntersectExceptExpr, "union" | "|"> {
+export class UnionExpr extends MultiOperativeExpr<"UnionExpr", TIntersectExceptExpr, "union" | "|"> {
     public static readonly operators: ["union", "|"] = ["union", "|"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TUnionExpr, number] {
-        const r = super.parseOp<TIntersectExceptExpr, "union" | "|">(
+        return MultiOperativeExpr.parseOp<TIntersectExceptExpr, "union" | "|", UnionExpr>(
             UnionExpr, IntersectExceptExpr, tokens, usedTokens,
         );
-        if (r[0].rest.length) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "UnionExpr";
 }
 
 export type TIntersectExceptExpr = IntersectExceptExpr | TInstanceofExpr;
-export class IntersectExceptExpr extends MultiOperativeExpr<TInstanceofExpr, "union" | "|"> {
+export class IntersectExceptExpr extends MultiOperativeExpr<"IntersectExceptExpr", TInstanceofExpr, "union" | "|"> {
     public static readonly operators: ["union", "|"] = ["union", "|"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TIntersectExceptExpr, number] {
-        const r = super.parseOp<TInstanceofExpr, "union" | "|">(
+        return MultiOperativeExpr.parseOp<TInstanceofExpr, "union" | "|", IntersectExceptExpr>(
             IntersectExceptExpr, InstanceofExpr, tokens, usedTokens);
-        if (r[0].rest.length) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "IntersectExceptExpr";
 }
 
 export type TInstanceofExpr = InstanceofExpr | TTreatExpr;
-export class InstanceofExpr extends SingleOperativeExpr<TTreatExpr, SequenceType> {
+export class InstanceofExpr extends SingleOperativeExpr<"InstanceofExpr", TTreatExpr, SequenceType> {
     public static readonly operator = ["instance", "of"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TInstanceofExpr, number] {
-        const r = SingleOperativeExpr.parseSingleOp<TTreatExpr, SequenceType>(InstanceofExpr, tokens, usedTokens);
-        if (r[0].right) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return SingleOperativeExpr.parseSingleOp<"InstanceofExpr", TTreatExpr, SequenceType>(
+            InstanceofExpr, tokens, usedTokens);
     }
 
     public static parseLeft(tokens: string[], usedTokens: number) {
@@ -503,17 +496,16 @@ export class InstanceofExpr extends SingleOperativeExpr<TTreatExpr, SequenceType
     public static parseRight(tokens: string[], usedTokens: number) {
         return SequenceType.parse(tokens, usedTokens);
     }
+    public readonly syntaxType = "InstanceofExpr";
 }
 
 export type TTreatExpr = TreatExpr | TCastableExpr;
-export class TreatExpr extends SingleOperativeExpr<TCastableExpr, SequenceType> {
+export class TreatExpr extends SingleOperativeExpr<"TreatExpr", TCastableExpr, SequenceType> {
     public static readonly operator = ["treat", "as"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TTreatExpr, number] {
-        const r = SingleOperativeExpr.parseSingleOp<TCastableExpr, SequenceType>(TreatExpr, tokens, usedTokens);
-        if (r[0].right) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return SingleOperativeExpr.parseSingleOp<"TreatExpr", TCastableExpr, SequenceType>(
+            TreatExpr, tokens, usedTokens);
     }
 
     public static parseLeft(tokens: string[], usedTokens: number) {
@@ -522,17 +514,16 @@ export class TreatExpr extends SingleOperativeExpr<TCastableExpr, SequenceType> 
     public static parseRight(tokens: string[], usedTokens: number) {
         return SequenceType.parse(tokens, usedTokens);
     }
+    public readonly syntaxType = "TreatExpr";
 }
 
 export type TCastableExpr = CastableExpr | TCastExpr;
-export class CastableExpr extends SingleOperativeExpr<TCastExpr, SingleType> {
+export class CastableExpr extends SingleOperativeExpr<"CastableExpr", TCastExpr, SingleType> {
     public static readonly operator = ["castable", "as"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TCastableExpr, number] {
-        const r = SingleOperativeExpr.parseSingleOp<TCastExpr, SingleType>(CastableExpr, tokens, usedTokens);
-        if (r[0].right) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return SingleOperativeExpr.parseSingleOp<"CastableExpr", TCastExpr, SingleType>(
+            CastableExpr, tokens, usedTokens);
     }
 
     public static parseLeft(tokens: string[], usedTokens: number) {
@@ -541,24 +532,24 @@ export class CastableExpr extends SingleOperativeExpr<TCastExpr, SingleType> {
     public static parseRight(tokens: string[], usedTokens: number) {
         return SingleType.parse(tokens, usedTokens);
     }
+    public readonly syntaxType = "CastableExpr";
 }
 
-export class SingleType extends FollowingUnaryOpExpr<EQName, "?"> {
+export class SingleType extends FollowingUnaryOpExpr<"SingleType", TEQName, "?"> {
     public static readonly operator: "?" = "?";
     public static parse(tokens: string[], usedTokens: number): [SingleType, number] {
-        return FollowingUnaryOpExpr.parseFollowing<EQName, "?">(SingleType, EQName, tokens, usedTokens);
+        return FollowingUnaryOpExpr.parseFollowing<TEQName, "?", SingleType>(SingleType, EQName, tokens, usedTokens);
     }
+
+    public readonly syntaxType = "SingleType";
 }
 
 export type TCastExpr = CastExpr | TArrowExpr;
-export class CastExpr extends SingleOperativeExpr<TArrowExpr, SingleType> {
+export class CastExpr extends SingleOperativeExpr<"CastExpr", TArrowExpr, SingleType> {
     public static readonly operator = ["cast", "as"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TCastExpr, number] {
-        const r = SingleOperativeExpr.parseSingleOp<TArrowExpr, SingleType>(CastExpr, tokens, usedTokens);
-        if (r[0].right) {
-            return r;
-        }
-        return [r[0].first, r[1]];
+        return SingleOperativeExpr.parseSingleOp<"CastExpr", TArrowExpr, SingleType>(CastExpr, tokens, usedTokens);
     }
 
     public static parseLeft(tokens: string[], usedTokens: number) {
@@ -567,20 +558,20 @@ export class CastExpr extends SingleOperativeExpr<TArrowExpr, SingleType> {
     public static parseRight(tokens: string[], usedTokens: number) {
         return SingleType.parse(tokens, usedTokens);
     }
+
+    public readonly syntaxType = "CastExpr";
 }
 
 export type TArrowExpr = ArrowExpr | TUnaryExpr;
-export class ArrowExpr extends ChainOperativeExpr<TUnaryExpr, "=>", ArrowFunctionExpr> {
+export class ArrowExpr extends ChainOperativeExpr<"ArrowExpr", TUnaryExpr, "=>", ArrowFunctionExpr> {
     public static readonly operators: ["=>"] = ["=>"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TArrowExpr, number] {
-        const r = ChainOperativeExpr.parseChain<TUnaryExpr, "=>", ArrowFunctionExpr>(
+        return ChainOperativeExpr.parseChain<TUnaryExpr, "=>", ArrowFunctionExpr, ArrowExpr>(
             ArrowExpr, UnaryExpr, ArrowFunctionExpr, tokens, usedTokens,
         );
-        if (r[0].rest) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType = "ArrowExpr";
 }
 
 export class ArgumentPlaceholder implements IXPathGrammar<"ArgumentPlaceholder"> {
@@ -595,6 +586,7 @@ export class ArgumentPlaceholder implements IXPathGrammar<"ArgumentPlaceholder">
         return [ArgumentPlaceholder.placeholder, tail + 1];
     }
 
+    public readonly syntaxType = "ArgumentPlaceholder";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -617,6 +609,7 @@ export class ContextItemExpr implements IXPathGrammar<"ContextItemExpr"> {
         return [ContextItemExpr.instance, tail + 1];
     }
 
+    public readonly syntaxType = "ContextItemExpr";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -630,7 +623,7 @@ export class ContextItemExpr implements IXPathGrammar<"ContextItemExpr"> {
 export class Wildcard implements IXPathGrammar<"Wildcard"> {
 
     public static readonly instance = new Wildcard();
-    public static parse(tokens: string[], usedTokens: number): [ContextItemExpr, number] {
+    public static parse(tokens: string[], usedTokens: number): [Wildcard, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] !== "*") {
@@ -639,6 +632,7 @@ export class Wildcard implements IXPathGrammar<"Wildcard"> {
         return [Wildcard.instance, tail + 1];
     }
 
+    public readonly syntaxType = "Wildcard";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -652,7 +646,7 @@ export class Wildcard implements IXPathGrammar<"Wildcard"> {
 export class EmptySequenceType implements IXPathGrammar<"EmptySequenceType"> {
 
     public static readonly instance = new EmptySequenceType();
-    public static parse(tokens: string[], usedTokens: number): [ContextItemExpr, number] {
+    public static parse(tokens: string[], usedTokens: number): [EmptySequenceType, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] !== "empty-sequence") {
@@ -669,6 +663,7 @@ export class EmptySequenceType implements IXPathGrammar<"EmptySequenceType"> {
         return [EmptySequenceType.instance, tail + 1];
     }
 
+    public readonly syntaxType = "EmptySequenceType";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -699,6 +694,7 @@ export class EmptyItemType implements IXPathGrammar<"EmptyItemType"> {
         return [EmptyItemType.instance, tail + 1];
     }
 
+    public readonly syntaxType = "EmptyItemType";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -730,6 +726,7 @@ export class AnyKindTest implements IXPathGrammar<"AnyKindTest"> {
         return [AnyKindTest.instance, tail + 1];
     }
 
+    public readonly syntaxType = "AnyKindTest";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -760,6 +757,7 @@ export class TextTest implements IXPathGrammar<"TextTest"> {
         return [TextTest.instance, tail + 1];
     }
 
+    public readonly syntaxType = "TextTest";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -793,6 +791,7 @@ export class NamespaceNodeTest implements IXPathGrammar<"NamespaceNodeTest"> {
         return [NamespaceNodeTest.instance, tail + 1];
     }
 
+    public readonly syntaxType = "NamespaceNodeTest";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -826,6 +825,7 @@ export class CommentTest implements IXPathGrammar<"CommentTest"> {
         return [CommentTest.instance, tail + 1];
     }
 
+    public readonly syntaxType = "CommentTest";
     private constructor() {}
 
     public render<T extends IPushable>(pushable: T): T {
@@ -897,7 +897,7 @@ export class ParenthesizedExpr implements IXPathGrammar<"ParenthesizedExpr"> {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] !== "(") {
-            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of ArgumentList");
+            throw new XPathUnexpectedTokenError(tokens, tail, "'(' of ParenthesizedExpr");
         }
         tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
         if (tokens[tail] === ")") {
@@ -906,7 +906,7 @@ export class ParenthesizedExpr implements IXPathGrammar<"ParenthesizedExpr"> {
         const [r, t] = Expr.parse(tokens, tail);
         tail = tokens[t] === " " ? t + 1 : t; // allow space
         if (tokens[tail] !== ")") {
-            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ArgumentList");
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ParenthesizedExpr");
         }
         return [new ParenthesizedExpr(r), tail + 1];
     }
@@ -955,7 +955,7 @@ export class UnaryExpr implements IXPathGrammar<"UnaryExpr"> {
     }
 }
 
-export class ArrowFunctionExpr {
+export class ArrowFunctionExpr implements IXPathGrammar<"ArrowFunctionExpr"> {
     public static parse(tokens: string[], usedTokens: number): [ArrowFunctionExpr, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
@@ -981,7 +981,7 @@ export class ArrowFunctionExpr {
 
     public readonly syntaxType: "ArrowFunctionExpr" = "ArrowFunctionExpr";
     public constructor(
-        public specifier: EQName | VarRef | ParenthesizedExpr,
+        public specifier: TEQName | VarRef | ParenthesizedExpr,
         public argList: Array<TExprSingle | ArgumentPlaceholder>,
     ) {}
 
@@ -1021,7 +1021,7 @@ export class VarRef implements IXPathGrammar<"VarRef"> {
     }
 
     public readonly syntaxType: "VarRef" = "VarRef";
-    public constructor(public name: EQName) {}
+    public constructor(public name: TEQName) {}
 
     public render<T extends IPushable>(pushable: T): T {
         pushable.push("$");
@@ -1034,22 +1034,19 @@ export class VarRef implements IXPathGrammar<"VarRef"> {
 }
 
 export type TSimpleMapExpr = SimpleMapExpr | TPathExpr;
-export class SimpleMapExpr extends MultiOperativeExpr<TPathExpr, "!"> {
+export class SimpleMapExpr extends MultiOperativeExpr<"SimpleMapExpr", TPathExpr, "!"> {
     public static readonly operators: ["!"] = ["!"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TSimpleMapExpr, number] {
-        const r = super.parseOp<TPathExpr, "!">(
+        return MultiOperativeExpr.parseOp<TPathExpr, "!", SimpleMapExpr>(
             SimpleMapExpr, PathExpr, tokens, usedTokens,
         );
-        if (r[0].rest.length) {
-            return r;
-        }
-        return [r[0].first, r[1]];
     }
+    public readonly syntaxType: "SimpleMapExpr" = "SimpleMapExpr";
 }
 
 export type TPathExpr = PathExpr;
 export class PathExpr implements IXPathGrammar<"PathExpr"> {
-    public static readonly operator: ["/", "//"] = ["/", "//"];
     public static parse(tokens: string[], usedTokens: number): [TPathExpr, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
         let leading: "/" | "//" | undefined;
@@ -1090,10 +1087,21 @@ export class PathExpr implements IXPathGrammar<"PathExpr"> {
 }
 
 export type TRelativePathExpr = RelativePathExpr | TStepExpr;
-export class RelativePathExpr extends MultiOperativeExpr<TStepExpr, "/" | "//"> {
+export class RelativePathExpr extends MultiOperativeExpr<"RelativePathExpr", TStepExpr, "/" | "//"> {
     public static readonly operators: ["/", "//"] = ["/", "//"];
+    public static readonly collapse: true = true;
     public static parse(tokens: string[], usedTokens: number): [TRelativePathExpr, number] {
-        return MultiOperativeExpr.parseOp<EQName, "/" | "//">(RelativePathExpr, StepExpr, tokens, usedTokens);
+        return MultiOperativeExpr.parseOp<TStepExpr, "/" | "//", RelativePathExpr>(
+            RelativePathExpr as any, StepExpr as any, tokens, usedTokens);
+    }
+    public readonly syntaxType = "RelativePathExpr";
+    public render<T extends IPushable>(pushable: T): T {
+        this.first.render(pushable);
+        for (const [o, i] of this.rest) {
+            pushable.push(o);
+            i.render(pushable);
+        }
+        return pushable;
     }
 }
 
@@ -1296,6 +1304,7 @@ export class ParentAxisStep implements IXPathGrammar<"ParentAxisStep"> {
         return [ParentAxisStep.instance, tail + 1];
     }
 
+    public readonly syntaxType = "ParentAxisStep";
     public isReverse() {
         return true;
     }
@@ -1319,8 +1328,6 @@ export class ParentAxisStep implements IXPathGrammar<"ParentAxisStep"> {
 export type PrimaryExpr
     = TLiteral | ParenthesizedExpr | VarRef | ContextItemExpr
     | FunctionCall | FunctionItemExpr | MapCons | TArrayCons | UnaryLookup;
-export type TLiteral = TNumericLiteral | StringLiteral;
-export type TNumericLiteral = IntegerLiteral | DecimalLiteral | DoubleLiteral;
 export type FunctionItemExpr = NamedFunctionRef | InlineFunctionExpr;
 export const PrimaryExpr = {
     parse(tokens: string[], usedTokens: number): [PrimaryExpr, number] {
@@ -1420,7 +1427,7 @@ export const PrimaryExpr = {
 
 export type TArrayCons = SquareArrayCons | CurlyArrayCons;
 export const ArrayCons = {
-    parse(tokens: string[], usedTokens: number): [TKeySpecifier, number] {
+    parse(tokens: string[], usedTokens: number): [TArrayCons, number] {
         let tail = usedTokens;
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] === "array") {
@@ -1562,11 +1569,13 @@ export class MapCons implements IXPathGrammar<"MapCons"> {
     }
 }
 
-export class UnaryLookup extends LeadingUnaryOpExpr<TKeySpecifier, "?"> {
+export class UnaryLookup extends LeadingUnaryOpExpr<"UnaryLookup", TKeySpecifier, "?"> {
     public static operator: "?" = "?";
     public static parse(tokens: string[], usedTokens: number): [UnaryLookup, number] {
-        return LeadingUnaryOpExpr.parseLeading<TKeySpecifier, "?">(UnaryLookup, KeySpecifier, tokens, usedTokens);
+        return LeadingUnaryOpExpr.parseLeading<TKeySpecifier, "?", UnaryLookup>(
+            UnaryLookup, KeySpecifier, tokens, usedTokens);
     }
+    public readonly syntaxType = "UnaryLookup";
 }
 
 export type TKeySpecifier = NCName | IntegerLiteral | ParenthesizedExpr | Wildcard;
@@ -1588,7 +1597,7 @@ export const KeySpecifier = {
 };
 
 export class FunctionCall implements IXPathGrammar<"FunctionCall"> {
-    public static parse(tokens: string[], usedTokens: number, parsedName?: EQName): [FunctionCall, number] {
+    public static parse(tokens: string[], usedTokens: number, parsedName?: TEQName): [FunctionCall, number] {
         let tail = usedTokens;
         let name = parsedName;
         if (!name) {
@@ -1606,7 +1615,7 @@ export class FunctionCall implements IXPathGrammar<"FunctionCall"> {
     }
 
     public readonly syntaxType: "FunctionCall" = "FunctionCall";
-    public constructor(public name: EQName, public args: Array<TExprSingle | ArgumentPlaceholder>) {}
+    public constructor(public name: TEQName, public args: Array<TExprSingle | ArgumentPlaceholder>) {}
     public render<T extends IPushable>(pushable: T): T {
         this.name.render(pushable);
         pushable.push("(");
@@ -1629,7 +1638,7 @@ export class FunctionCall implements IXPathGrammar<"FunctionCall"> {
 }
 
 export class NamedFunctionRef implements IXPathGrammar<"NamedFunctionRef"> {
-    public static parse(tokens: string[], usedTokens: number, parsedName?: EQName): [NamedFunctionRef, number] {
+    public static parse(tokens: string[], usedTokens: number, parsedName?: TEQName): [NamedFunctionRef, number] {
         let tail = usedTokens;
         let name = parsedName;
         if (!name) {
@@ -1647,7 +1656,7 @@ export class NamedFunctionRef implements IXPathGrammar<"NamedFunctionRef"> {
     }
 
     public readonly syntaxType: "NamedFunctionRef" = "NamedFunctionRef";
-    public constructor(public name: EQName, public arity: IntegerLiteral) {}
+    public constructor(public name: TEQName, public arity: IntegerLiteral) {}
     public render<T extends IPushable>(pushable: T): T {
         this.name.render(pushable);
         pushable.push("#");
@@ -1715,11 +1724,13 @@ export class InlineFunctionExpr implements IXPathGrammar<"InlineFunctionExpr"> {
     }
 }
 
-export class ParamList extends MultiOperativeExpr<Param, ","> {
+export class ParamList extends MultiOperativeExpr<"ParamList", Param, ","> {
     public static operators: [","] = [","];
+    public static collapse: false = false;
     public static parse(tokens: string[], usedTokens: number): [ParamList, number] {
-        return MultiOperativeExpr.parseOp<Param, ",">(ParamList, Param, tokens, usedTokens);
+        return MultiOperativeExpr.parseOp<Param, ",", ParamList>(ParamList, Param, tokens, usedTokens);
     }
+    public readonly syntaxType = "ParamList";
 }
 
 export class Param implements IXPathGrammar<"Param"> {
@@ -1742,7 +1753,7 @@ export class Param implements IXPathGrammar<"Param"> {
     }
 
     public readonly syntaxType: "Param" = "Param";
-    public constructor(public name: EQName, public asType?: SequenceType) {}
+    public constructor(public name: TEQName, public asType?: SequenceType) {}
 
     public render<T extends IPushable>(pushable: T): T {
         pushable.push("$");
@@ -1871,7 +1882,7 @@ export class ParenthesizedItemType implements IXPathGrammar<"ParenthesizedItemTy
 }
 
 export type TItemType
-    = EmptyItemType | EQName | ParenthesizedItemType
+    = EmptyItemType | TEQName | ParenthesizedItemType
     | TFunctionTest | TMapTest | TArrayTest | TKindTest;
 export const ItemType = {
     parse(tokens: string[], usedTokens: number): [TItemType, number] {
@@ -1910,7 +1921,7 @@ export type TFunctionTest = FunctionTest<SequenceType[], SequenceType> | Readonl
 export class FunctionTest<
     T extends SequenceType[] | Wildcard,
     R extends SequenceType | undefined
-> implements IXPathGrammar {
+> implements IXPathGrammar<"FunctionTest"> {
     public static readonly anyFunction = Object.freeze(
         new FunctionTest<Wildcard, undefined>(Wildcard.instance, undefined),
     );
@@ -1962,6 +1973,7 @@ export class FunctionTest<
         return [new FunctionTest(args, r), rt];
     }
 
+    public readonly syntaxType = "FunctionTest";
     private constructor(public args: T, public ret: R) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2020,6 +2032,7 @@ export class DocumentTest implements IXPathGrammar<"DocumentTest"> {
         return [new DocumentTest(v), tail + 1];
     }
 
+    public readonly syntaxType = "DocumentTest";
     private constructor(public root: undefined | TElementTest | SchemaElementTest) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2035,13 +2048,13 @@ export class DocumentTest implements IXPathGrammar<"DocumentTest"> {
 }
 
 export type TAttributeTest
-    = AttributeTest<EQName, EQName | undefined>
-    | AttributeTest<Wildcard, EQName> | Readonly<AttributeTest<Wildcard>>;
+    = AttributeTest<TEQName, TEQName | undefined>
+    | AttributeTest<Wildcard, TEQName> | Readonly<AttributeTest<Wildcard>>;
 
 export class AttributeTest<
-    N extends EQName | Wildcard,
-    T extends EQName | undefined = undefined
-> implements IXPathGrammar {
+    N extends TEQName | Wildcard,
+    T extends TEQName | undefined = undefined
+> implements IXPathGrammar<"AttributeTest"> {
     public static readonly anyAttribute = Object.freeze(
         new AttributeTest<Wildcard>(Wildcard.instance, undefined),
     );
@@ -2064,11 +2077,11 @@ export class AttributeTest<
         if (tokens[tail] === ")") {
             return [AttributeTest.anyAttribute, tail + 1];
         }
-        let n: Wildcard | EQName;
+        let n: Wildcard | TEQName;
         if (tokens[tail] === "*") {
             tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
             if (tokens[tail] === ")") {
-                return [ElementTest.anyElement, tail + 1];
+                return [AttributeTest.anyAttribute, tail + 1];
             }
             n = Wildcard.instance;
         } else {
@@ -2078,10 +2091,10 @@ export class AttributeTest<
         }
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] === ")") {
-            return [new AttributeTest(n, undefined), tail + 1];
+            return [new AttributeTest(n as any, undefined), tail + 1];
         }
         if (tokens[tail] !== ",") {
-            throw new XPathUnexpectedTokenError(tokens, tail, "',' of ElementTest");
+            throw new XPathUnexpectedTokenError(tokens, tail, "',' of AttributeTest");
         }
         tail = tokens[tail] === " " ? tail + 2 : tail + 1; // allow space
 
@@ -2089,11 +2102,12 @@ export class AttributeTest<
         tail = tokens[vt] === " " ? vt + 1 : vt; // allow space
 
         if (tokens[tail] !== ")") {
-            throw new XPathUnexpectedTokenError(tokens, tail, "')' of ElementTest");
+            throw new XPathUnexpectedTokenError(tokens, tail, "')' of AttributeTest");
         }
-        return [new AttributeTest(n, t), tail + 1];
+        return [new AttributeTest(n as any, t), tail + 1];
     }
 
+    public readonly syntaxType = "AttributeTest";
     private constructor(public name: N, public type: T) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2111,12 +2125,12 @@ export class AttributeTest<
 }
 
 export type TElementTest
-    = ElementTest<EQName, EQName | undefined>
-    | ElementTest<Wildcard, EQName> | Readonly<ElementTest<Wildcard>>;
+    = ElementTest<TEQName, TEQName | undefined>
+    | ElementTest<Wildcard, TEQName> | Readonly<ElementTest<Wildcard>>;
 export class ElementTest<
-    N extends EQName | Wildcard,
-    T extends EQName | undefined = undefined
-> implements IXPathGrammar {
+    N extends TEQName | Wildcard,
+    T extends TEQName | undefined = undefined
+> implements IXPathGrammar<"ElementTest"> {
     public static readonly anyElement = Object.freeze(
         new ElementTest<Wildcard>(Wildcard.instance, undefined),
     );
@@ -2128,7 +2142,7 @@ export class ElementTest<
         if (tokens[tail] !== "element") {
             throw new XPathUnexpectedTokenError(
                 tokens, usedTokens,
-                "['map', '('] of ElementTest",
+                "['element', '('] of ElementTest",
             );
         }
         tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
@@ -2139,7 +2153,7 @@ export class ElementTest<
         if (tokens[tail] === ")") {
             return [ElementTest.anyElement, tail + 1];
         }
-        let n: Wildcard | EQName;
+        let n: Wildcard | TEQName;
         if (tokens[tail] === "*") {
             tail = tokens[tail + 1] === " " ? tail + 2 : tail + 1; // allow space
             if (tokens[tail] === ")") {
@@ -2153,7 +2167,7 @@ export class ElementTest<
         }
         tail = tokens[tail] === " " ? tail + 1 : tail; // allow space
         if (tokens[tail] === ")") {
-            return [new ElementTest(n, undefined), tail + 1];
+            return [new ElementTest(n as any, undefined), tail + 1];
         }
         if (tokens[tail] !== ",") {
             throw new XPathUnexpectedTokenError(tokens, tail, "',' of ElementTest");
@@ -2172,9 +2186,10 @@ export class ElementTest<
         if (tokens[tail] !== ")") {
             throw new XPathUnexpectedTokenError(tokens, tail, "')' of ElementTest");
         }
-        return [new ElementTest(n, t, tn), tail + 1];
+        return [new ElementTest(n as any, t, tn), tail + 1];
     }
 
+    public readonly syntaxType = "ElementTest";
     private constructor(public name: N, public type: T, public typeNullable: boolean = true) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2191,10 +2206,10 @@ export class ElementTest<
     public toString() { return this.render([]).join(""); }
 }
 
-export type TMapTest = MapTest<[EQName, SequenceType]> | Readonly<MapTest<Wildcard>>;
+export type TMapTest = MapTest<[TEQName, SequenceType]> | Readonly<MapTest<Wildcard>>;
 export class MapTest<
-    T extends [EQName, SequenceType] | Wildcard
-> implements IXPathGrammar {
+    T extends [TEQName, SequenceType] | Wildcard
+> implements IXPathGrammar<"MapTest"> {
     public static readonly anyMap = Object.freeze(
         new MapTest<Wildcard>(Wildcard.instance),
     );
@@ -2239,6 +2254,7 @@ export class MapTest<
         return [new MapTest([k, v]), tail + 1];
     }
 
+    public readonly syntaxType = "MapTest";
     private constructor(public type: T) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2266,7 +2282,7 @@ export class MapTest<
 export type TArrayTest = ArrayTest<SequenceType> | Readonly<ArrayTest<Wildcard>>;
 export class ArrayTest<
     T extends SequenceType | Wildcard
-> implements IXPathGrammar {
+> implements IXPathGrammar<"ArrayTest"> {
     public static readonly anyArray = Object.freeze(
         new ArrayTest<Wildcard>(Wildcard.instance),
     );
@@ -2303,6 +2319,7 @@ export class ArrayTest<
         return [new ArrayTest(v), tail + 1];
     }
 
+    public readonly syntaxType = "ArrayTest";
     private constructor(public type: T) {}
 
     public render<P extends IPushable>(pushable: P): P {
@@ -2551,202 +2568,6 @@ export const KindTest = {
     },
 };
 
-export abstract class NumericLiteral<S extends string> implements IXPathGrammar<S> {
-    public static parse(tokens: string[], usedTokens: number): [TNumericLiteral, number] {
-        const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (!tokens[tail]) {
-            throw new XPathUnexpectedTokenError(tokens, tail, "NumericLiteral");
-        }
-        if (/^[0-9]$/.test(tokens[tail])) {
-            if (tokens[tail + 1] !== ".") {
-                return IntegerLiteral.parse(tokens, tail);
-            }
-            if (!tokens[tail + 2]) {
-                throw new XPathUnexpectedTokenError(tokens, tail, "NumericLiteral");
-            }
-            if (/^[0-9]+$/.test(tokens[tail + 2])) {
-                return DecimalLiteral.parse(tokens, tail);
-            }
-            if (/^[0-9]+[eE]/.test(tokens[tail + 2])) {
-                return DoubleLiteral.parse(tokens, tail);
-            }
-            throw new XPathUnexpectedTokenError(tokens, tail, "NumericLiteral");
-        }
-        if (tokens[tail] === ".") {
-            if (/^[0-9]+$/.test(tokens[tail + 1])) {
-                return DecimalLiteral.parse(tokens, tail);
-            }
-            if (/^[0-9]+[Ee]/.test(tokens[tail + 1])) {
-                return DoubleLiteral.parse(tokens, tail);
-            }
-        }
-        if (/^[0-9]*\.[0-9]+[eE]/.test(tokens[tail])) {
-            return DoubleLiteral.parse(tokens, tail);
-        }
-        if (/^[0-9]*\.[0-9]+$/.test(tokens[tail])) {
-            return DecimalLiteral.parse(tokens, tail);
-        }
-        throw new XPathUnexpectedTokenError(tokens, tail, "NumericLiteral");
-    }
-
-    public abstract readonly syntaxType: S;
-    public abstract render<T extends IPushable>(pushable: T): T;
-}
-
-export class DecimalLiteral extends NumericLiteral<"DecimalLiteral"> {
-    public static parse(tokens: string[], usedTokens: number): [DecimalLiteral, number] {
-        const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (!tokens[tail]) {
-            throw new XPathUnexpectedTokenError(tokens, tail, "DecimalLiteral");
-        }
-        if (tokens[tail] === ".") {
-            if (!tokens[tail + 1] || !/^[0-9]+$/.test(tokens[tail + 1])) {
-                throw new XPathUnexpectedTokenError(tokens, tail, "DecimalLiteral");
-            }
-            return [new DecimalLiteral(new Decie("." + tokens[tail + 1])), tail + 2];
-        }
-        if (/^[0-9]*\.[0-9]+$/.test(tokens[tail])) {
-            return [new DecimalLiteral(new Decie(tokens[tail])), tail + 1];
-        }
-        if (/^[0-9]+$/.test(tokens[tail])) {
-            if (tokens[tail + 1] === ".") {
-                if (tokens[tail + 2] && /^[0-9]+$/.test(tokens[tail + 2])) {
-                    return [new DecimalLiteral(new Decie(tokens[tail] + "." + tokens[tail + 2])), tail + 3];
-                }
-            }
-            return [new DecimalLiteral(new Decie(tokens[tail])), tail + 1];
-        }
-        throw new XPathUnexpectedTokenError(tokens, tail, "DecimalLiteral");
-    }
-
-    public readonly syntaxType: "DecimalLiteral" = "DecimalLiteral";
-    public constructor(public value: Decie) {
-        super();
-    }
-
-    public render<T extends IPushable>(pushable: T): T {
-        pushable.push(this.value.toString());
-        return pushable;
-    }
-
-    public toString() {
-        return this.value.toString();
-    }
-}
-
-export class DoubleLiteral extends NumericLiteral<"DoubleLiteral"> {
-    public static parse(tokens: string[], usedTokens: number): [DoubleLiteral, number] {
-        let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (!tokens[tail]) {
-            throw new XPathUnexpectedTokenError(tokens, tail, "DoubleLiteral");
-        }
-        const matches: string[] = [];
-        if (/^[0-9]+$/.test(tokens[tail])) {
-            matches.push(tokens[tail++]);
-        }
-        if (tokens[tail] === ".") {
-            if (!tokens[tail + 1] || !/^[0-9]+$/.test(tokens[tail + 1])) {
-                throw new XPathUnexpectedTokenError(tokens, tail, "DoubleLiteral");
-            }
-            matches.push("." + tokens[tail + 1]);
-            tail += 2;
-        }
-        if (matches.length === 0 && /^[0-9]*\.[0-9]+$/.test(tokens[tail])) {
-            matches.push(tokens[tail++]);
-        }
-        if (matches.length === 0) {
-            throw new XPathUnexpectedTokenError(tokens, tail, "DoubleLiteral");
-        }
-        if (tokens[tail] === "E" || tokens[tail] === "e") {
-            matches.push(tokens[tail++]);
-            if (tokens[tail] === "+" || tokens[tail] === "-") {
-                matches.push(tokens[tail++]);
-            }
-            if (!/^[0-9]+$/.test(tokens[tail])) {
-                throw new XPathUnexpectedTokenError(tokens, tail, "DoubleLiteral");
-            }
-            matches.push(tokens[tail++]);
-        }
-        return [new DoubleLiteral(parseFloat(matches.join(""))), tail];
-    }
-
-    public readonly syntaxType: "DoubleLiteral" = "DoubleLiteral";
-    public constructor(public value: number) {
-        super();
-    }
-
-    public render<T extends IPushable>(pushable: T): T {
-        pushable.push(this.value.toExponential());
-        return pushable;
-    }
-
-    public toString() {
-        return this.value.toExponential();
-    }
-}
-
-export class IntegerLiteral extends NumericLiteral<"IntegerLiteral"> {
-    public static parse(tokens: string[], usedTokens: number): [IntegerLiteral, number] {
-        const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (!tokens[tail]) {
-            throw new XPathUnexpectedTokenError(tokens, tail, "IntegerLiteral");
-        }
-        if (/^[0-9]+$/.test(tokens[tail])) {
-            return [new IntegerLiteral(new Biggie(tokens[tail])), tail + 1];
-        }
-        throw new XPathUnexpectedTokenError(tokens, tail, "IntegerLiteral");
-    }
-
-    public readonly syntaxType: "IntegerLiteral" = "IntegerLiteral";
-    public constructor(public value: IBiggie) {
-        super();
-    }
-
-    public render<T extends IPushable>(pushable: T): T {
-        pushable.push(this.value.toString());
-        return pushable;
-    }
-
-    public toString() {
-        return this.value.toString();
-    }
-}
-
-export class StringLiteral implements IXPathGrammar<"StringLiteral"> {
-    public static parse(tokens: string[], usedTokens: number, defToken: string = ":="): [StringLiteral, number] {
-        const tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
-        if (tokens[tail] !== "'" && tokens[tail] !== "\"") {
-            throw new XPathUnexpectedTokenError(tokens, tail, "'\\'' | '\"'");
-        }
-        if (tokens[tail] !== tokens[tail + 2]) {
-            throw new XPathUnexpectedTokenError(tokens, tail + 2, "end of string literal");
-        }
-        return [new StringLiteral(tokens[tail] as "\"" | "'", tokens[tail + 1]), tail + 3];
-    }
-
-    public readonly syntaxType: "StringLiteral" = "StringLiteral";
-    public constructor(public wrapperToken: "\"" | "'", public value: string) {}
-
-    /**
-     * Push the tokens for this expression to an object.
-     * @template T
-     * @param {T} pushable the object to `push` to
-     * @returns {T}
-     */
-    public render<T extends IPushable>(pushable: T): T {
-        pushable.push(
-            this.wrapperToken,
-            this.value.replace(new RegExp(this.wrapperToken, "g"), "$0$0"),
-            this.wrapperToken,
-        );
-        return pushable;
-    }
-
-    public toString() {
-        return this.render([]).join("");
-    }
-}
-
 export class SimpleBinding implements IXPathGrammar<"SimpleBinding"> {
     public static parse(tokens: string[], usedTokens: number, defToken: string = ":="): [SimpleBinding, number] {
         let tail = tokens[usedTokens] === " " ? usedTokens + 1 : usedTokens; // allow space
@@ -2919,226 +2740,5 @@ export class QName extends EQName<"QName"> {
         }
         this.localName.render(pushable);
         return pushable;
-    }
-}
-
-function nameStartChar(c: number) {
-    return c && ((c >= 65 && c <= 90) || c === 95 || (c >= 97 && c <= 122)
-        || (c >= 0xC0 && c <= 0x02FF && c !== 0xD7 && c !== 0xF7)
-        || (c >= 0x0370 && c <= 0x1FFF && c !== 0x037E)
-        || (c === 0x200C || c === 0x200D)
-        || (c >= 0x2070 && c <= 0x218F)
-        || (c >= 0x2C00 && c <= 0x2FEF)
-        || (c >= 0x3001 && c <= 0xD7FF)
-        || (c >= 0xF900 && c <= 0xFDCF)
-        || (c >= 0xFDF0 && c <= 0xFFFD)
-        || (c >= 0x10000 && c <= 0xEFFFF)
-    );
-}
-
-function nameChar(c: number) {
-    return c && ((c >= 65 && c <= 90) || c === 95 || (c >= 97 && c <= 122)
-        || (c >= 0xC0 && c <= 0x02FF && c !== 0xD7 && c !== 0xF7)
-        || (c >= 0x0370 && c <= 0x1FFF && c !== 0x037E)
-        || (c === 0x200C || c === 0x200D)
-        || (c >= 0x2070 && c <= 0x218F)
-        || (c >= 0x2C00 && c <= 0x2FEF)
-        || (c >= 0x3001 && c <= 0xD7FF)
-        || (c >= 0xF900 && c <= 0xFDCF)
-        || (c >= 0xFDF0 && c <= 0xFFFD)
-        || (c >= 0x10000 && c <= 0xEFFFF)
-        || (c >= 0x0030 && c <= 0x0039)
-        || c === 0x002E || c === 0x002D
-        || (c >= 0x0300 && c <= 0x036F)
-        || (c >= 0x203F && c <= 0x2040)
-    );
-}
-
-export class NCName implements IXPathGrammar<"NCName"> {
-    public static parse(tokens: string[], usedTokens: number): [NCName, number] {
-        let name = "";
-        let tail = usedTokens;
-        let t = tokens[tail];
-        let c = t ? t.charCodeAt(0) : 0;
-        if (!nameStartChar(c)) {
-            throw new XPathUnexpectedTokenError(tokens, usedTokens, "NameStartChar of NCName");
-        }
-        do {
-            name += t;
-            tail++;
-            t = tokens[tail];
-            c = t ? t.charCodeAt(0) : 0;
-        } while (nameChar(c));
-        return [new NCName(name), tail];
-    }
-
-    public readonly syntaxType: "NCName" = "NCName";
-    public constructor(public name: string) {}
-
-    /**
-     * Push the tokens for this expression to an object.
-     * @template T
-     * @param {T} pushable the object to `push` to
-     * @returns {T}
-     */
-    public render<T extends IPushable>(pushable: T): T {
-        pushable.push(this.name);
-        return pushable;
-    }
-
-    public toString(): string {
-        return this.render([]).join("");
-    }
-}
-
-export class XPath {
-    public static tokenize(xpath: string) {
-        let i = 0;
-        const l = xpath.length;
-        const r: string[] = [];
-        while (i !== l) {
-            let c = xpath.charCodeAt(i);
-            if (c === 8 || c === 10 || c === 13 || c === 32) {
-                r.push(" ");
-                do {
-                    c = xpath.charCodeAt(++i);
-                } while (c === 8 || c === 10 || c === 13 || c === 32);
-                continue;
-            }
-            if (c === 0x21) {
-                if (xpath.charCodeAt(++i) === 0x3D) {
-                    r.push("!=");
-                    i++;
-                } else {
-                    r.push("!");
-                }
-                continue;
-            }
-            if (c === 0x22 || c === 0x27) {
-                let s = "";
-                const ch = c === 0x22 ? "\"" : "'";
-                i++;
-                while (i < l) {
-                    const pos = xpath.indexOf(ch, i);
-                    if (pos === -1) {
-                        throw new XPathParseError(
-                            "tokenize-strlit", "Mismatching number of quote characters `" + ch + "`", undefined, i,
-                        );
-                    }
-                    if (xpath.charCodeAt(pos + 1) === c) {
-                        s += xpath.substring(i, pos + 1);
-                        i = pos + 2;
-                        continue;
-                    }
-                    s += xpath.substring(i, pos);
-                    i = pos;
-                    break;
-                }
-                if (xpath.charCodeAt(i) !== c) {
-                    throw new XPathParseError(
-                        "tokenize-strlit", "Mismatching number of quote characters `" + ch + "`", undefined, i,
-                    );
-                }
-                i++;
-                r.push(ch, s, ch);
-                continue;
-            }
-            if (c >= 0x23 && c <= 0x2D) {
-                r.push(xpath.charAt(i++));
-                continue;
-            }
-            if (c === 0x2E) {
-                let s = ".";
-                let n = xpath.charAt(++i);
-                while (n === ".") {
-                    s += n;
-                    n = xpath.charAt(++i);
-                }
-                r.push(s);
-                continue;
-            }
-            if (c === 0x2F) {
-                let s = "/";
-                let n = xpath.charAt(++i);
-                while (n === "/") {
-                    s += n;
-                    n = xpath.charAt(++i);
-                }
-                r.push(s);
-                continue;
-            }
-            if (c >= 0x30 && c <= 0x39) {
-                let s = "";
-                let n = c;
-                while (n >= 0x30 && n <= 0x39) {
-                    s += String.fromCharCode(n);
-                    n = xpath.charCodeAt(++i);
-                }
-                r.push(s);
-                continue;
-            }
-            if (c === 0x3A) {
-                let s = ":";
-                let n = xpath.charAt(++i);
-                while (n === ":" || n === "=") {
-                    s += n;
-                    n = xpath.charAt(++i);
-                }
-                r.push(s);
-                continue;
-            }
-            if (c === 0x3B) {
-                r.push(";");
-                i++;
-                continue;
-            }
-            if (c >= 0x3C && c <= 0x3E) {
-                let s = "";
-                let n = xpath.charAt(i);
-                while (n === "<" || n === "=" || n === ">") {
-                    s += n;
-                    n = xpath.charAt(++i);
-                }
-                r.push(s);
-                continue;
-            }
-            if (c >= 0x3F && c <= 0x40) {
-                r.push(xpath.charAt(i++));
-                continue;
-            }
-            if (c >= 0x5B && c <= 0x60) {
-                r.push(xpath.charAt(i++));
-                continue;
-            }
-            if (c === 0x7B || c === 0x7E) {
-                r.push(xpath.charAt(i++));
-                continue;
-            }
-            if (c === 0x7C) {
-                let s = "";
-                while (xpath.charAt(i++) === "|") {
-                    s += "|";
-                }
-                r.push(s);
-                continue;
-            }
-            if (nameStartChar(c)) {
-                const start = i;
-                while (i < l && nameChar(xpath.charCodeAt(++i))) {
-                    // incr `i`
-                }
-                r.push(xpath.substring(start, i));
-                continue;
-            }
-            throw new XPathParseError(
-                "tokenize-unexpected", "Unexpected character with code `" + c + "`", undefined, i,
-            );
-        }
-        return r;
-    }
-
-    public static parse(tokens: string[] | string) {
-        tokens = typeof tokens === "string" ? XPath.tokenize(tokens) : tokens;
-        return Expr.parse(tokens, 0);
     }
 }
